@@ -195,30 +195,109 @@ function DoorLogModal({ pin, onClose, onSave, techs }) {
 }
 
 // ─── Map View ─────────────────────────────────────────────────────────────────
+const GOOGLE_MAPS_API_KEY = 'AIzaSyC9Ht86RatKeP8grKML8gzWmDts5Z0J0NM';
+const LUBBOCK_CENTER = { lat: 33.5779, lng: -101.8552 };
+
+function loadGoogleMaps() {
+  return new Promise((resolve) => {
+    if (window.google && window.google.maps) { resolve(); return; }
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places`;
+    script.async = true;
+    script.onload = resolve;
+    document.head.appendChild(script);
+  });
+}
+
 function MapView({ pins, setPins, currentUser, allUsers }) {
   const [modal, setModal] = useState(null);
+  const [mapReady, setMapReady] = useState(false);
+  const mapRef = useEffect;
+  const mapDivRef = React.useRef(null);
+  const googleMapRef = React.useRef(null);
+  const markersRef = React.useRef([]);
   const techs = allUsers.filter(u => u.role === 'tech');
   const visiblePins = currentUser.role === 'admin' ? pins : pins.filter(p => p.rep_id === currentUser.id);
 
-  const handleMapClick = (e) => {
-    if (currentUser.role !== 'rep') return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
-    const streets = ['Frankford Ave', 'Slide Rd', 'Quaker Ave', '82nd St', 'Indiana Ave', 'Utica Ave', 'Loop 289'];
-    setModal({ x, y, address: `${Math.floor(Math.random() * 9000 + 1000)} ${streets[Math.floor(Math.random() * streets.length)]}, Lubbock TX`, rep_id: currentUser.id });
-  };
+  // Load Google Maps and init
+  useEffect(() => {
+    loadGoogleMaps().then(() => {
+      if (!mapDivRef.current) return;
+      const map = new window.google.maps.Map(mapDivRef.current, {
+        center: LUBBOCK_CENTER,
+        zoom: 13,
+        styles: [
+          { elementType: 'geometry', stylers: [{ color: '#1a1a24' }] },
+          { elementType: 'labels.text.stroke', stylers: [{ color: '#111118' }] },
+          { elementType: 'labels.text.fill', stylers: [{ color: '#8888aa' }] },
+          { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#2a2a3a' }] },
+          { featureType: 'road.arterial', elementType: 'labels.text.fill', stylers: [{ color: '#6666aa' }] },
+          { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#3a3a50' }] },
+          { featureType: 'road.highway', elementType: 'labels.text.fill', stylers: [{ color: '#4f8ef7' }] },
+          { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0a0a0f' }] },
+          { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+          { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+        ],
+        disableDefaultUI: false,
+        zoomControl: true,
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: false,
+      });
+      googleMapRef.current = map;
+
+      // Click to drop pin (reps only)
+      if (currentUser.role === 'rep') {
+        map.addListener('click', async (e) => {
+          const lat = e.latLng.lat();
+          const lng = e.latLng.lng();
+          // Reverse geocode to get address
+          const geocoder = new window.google.maps.Geocoder();
+          geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+            const address = status === 'OK' && results[0] ? results[0].formatted_address : `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+            setModal({ lat, lng, address, rep_id: currentUser.id });
+          });
+        });
+      }
+      setMapReady(true);
+    });
+  }, []);
+
+  // Render pins as markers on the map
+  useEffect(() => {
+    if (!googleMapRef.current || !mapReady) return;
+    // Clear old markers
+    markersRef.current.forEach(m => m.setMap(null));
+    markersRef.current = [];
+    visiblePins.forEach(pin => {
+      if (!pin.lat || !pin.lng) return;
+      const marker = new window.google.maps.Marker({
+        position: { lat: pin.lat, lng: pin.lng },
+        map: googleMapRef.current,
+        icon: {
+          path: window.google.maps.SymbolPath.CIRCLE,
+          scale: 9,
+          fillColor: PIN_COLORS[pin.status] || '#888',
+          fillOpacity: 1,
+          strokeColor: 'rgba(255,255,255,0.5)',
+          strokeWeight: 2,
+        },
+        title: pin.address,
+      });
+      marker.addListener('click', () => setModal(pin));
+      markersRef.current.push(marker);
+    });
+  }, [visiblePins, mapReady]);
 
   const handleSave = async (data) => {
     if (data.id) {
       const { data: updated } = await supabase.from('pins').update({ address: data.address, name: data.name, status: data.status, service: data.service, price: data.price, notes: data.notes, follow_up_date: data.follow_up_date || null, tech_id: data.tech_id || null, agreed: data.agreed }).eq('id', data.id).select().single();
       setPins(ps => ps.map(p => p.id === data.id ? updated : p));
-      // Create job if appointment or closed
       if (['appointment', 'closed'].includes(data.status) && data.tech_id) {
         await supabase.from('jobs').insert({ address: data.address, customer_name: data.name, service: data.service, price: data.price, monthly_price: data.service === 'quarterly' ? data.price / 3 : null, status: 'scheduled', rep_id: data.rep_id, tech_id: data.tech_id, scheduled_date: data.follow_up_date || null, agreement_signed: data.agreed, card_on_file: false, notes: data.notes });
       }
     } else {
-      const { data: inserted } = await supabase.from('pins').insert({ x: data.x, y: data.y, address: data.address, name: data.name, status: data.status, service: data.service || null, price: data.price || null, notes: data.notes, follow_up_date: data.follow_up_date || null, rep_id: data.rep_id, tech_id: data.tech_id || null, agreed: data.agreed }).select().single();
+      const { data: inserted } = await supabase.from('pins').insert({ lat: data.lat, lng: data.lng, x: 50, y: 50, address: data.address, name: data.name, status: data.status, service: data.service || null, price: data.price || null, notes: data.notes, follow_up_date: data.follow_up_date || null, rep_id: data.rep_id, tech_id: data.tech_id || null, agreed: data.agreed }).select().single();
       setPins(ps => [...ps, inserted]);
       if (['appointment', 'closed'].includes(data.status) && data.tech_id) {
         await supabase.from('jobs').insert({ address: data.address, customer_name: data.name, service: data.service, price: data.price, monthly_price: data.service === 'quarterly' ? data.price / 3 : null, status: 'scheduled', rep_id: data.rep_id, tech_id: data.tech_id, scheduled_date: data.follow_up_date || null, agreement_signed: data.agreed, card_on_file: false, notes: data.notes });
@@ -237,31 +316,18 @@ function MapView({ pins, setPins, currentUser, allUsers }) {
               {STATUS_CONFIG[k]?.label}
             </span>
           ))}
+          <span style={{ fontSize: 11, color: '#4f8ef7', background: 'rgba(79,142,247,0.08)', border: '1px solid rgba(79,142,247,0.2)', borderRadius: 20, padding: '3px 10px' }}>{visiblePins.length} pins</span>
         </div>
       </div>
-      <div style={{ flex: 1, position: 'relative', background: '#111118', cursor: currentUser.role === 'rep' ? 'crosshair' : 'default' }} onClick={handleMapClick}>
-        <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0.07 }}>
-          {[15,25,35,45,55,65,75,85].map(x => <line key={`v${x}`} x1={`${x}%`} y1="0" x2={`${x}%`} y2="100%" stroke="#4f8ef7" strokeWidth="1" />)}
-          {[15,25,35,45,55,65,75,85].map(y => <line key={`h${y}`} x1="0" y1={`${y}%`} x2="100%" y2={`${y}%`} stroke="#4f8ef7" strokeWidth="1" />)}
-        </svg>
-        <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
-          <text x="16%" y="32%" fill="#4f8ef7" fontSize="11" opacity="0.4">Frankford Ave</text>
-          <text x="36%" y="32%" fill="#4f8ef7" fontSize="11" opacity="0.4">Slide Rd</text>
-          <text x="56%" y="32%" fill="#4f8ef7" fontSize="11" opacity="0.4">Quaker Ave</text>
-          <text x="6%" y="46%" fill="#4f8ef7" fontSize="11" opacity="0.4">82nd St</text>
-          <text x="6%" y="61%" fill="#4f8ef7" fontSize="11" opacity="0.4">University Ave</text>
-          <text x="6%" y="76%" fill="#4f8ef7" fontSize="11" opacity="0.4">Loop 289</text>
-        </svg>
-        <div style={{ position: 'absolute', top: 14, left: '50%', transform: 'translateX(-50%)', background: 'rgba(79,142,247,0.08)', border: '1px solid rgba(79,142,247,0.2)', borderRadius: 20, padding: '4px 14px', fontSize: 11, color: '#4f8ef7' }}>
-          Lubbock, TX · {visiblePins.length} pins
-        </div>
-        {visiblePins.map(pin => (
-          <div key={pin.id} style={{ position: 'absolute', left: `${pin.x}%`, top: `${pin.y}%`, transform: 'translate(-50%,-100%)', cursor: 'pointer', zIndex: 5 }} onClick={e => { e.stopPropagation(); setModal(pin); }}>
-            <div style={{ width: 18, height: 18, borderRadius: '50% 50% 50% 0', transform: 'rotate(-45deg)', background: PIN_COLORS[pin.status] || '#888', border: '2px solid rgba(255,255,255,0.35)', boxShadow: `0 2px 8px ${PIN_COLORS[pin.status] || '#888'}88` }} />
+      <div style={{ flex: 1, position: 'relative' }}>
+        <div ref={mapDivRef} style={{ width: '100%', height: '100%' }} />
+        {!mapReady && (
+          <div style={{ position: 'absolute', inset: 0, background: '#111118', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8888aa', fontSize: 14 }}>
+            Loading map...
           </div>
-        ))}
-        {currentUser.role === 'rep' && (
-          <div style={{ position: 'absolute', bottom: 14, left: '50%', transform: 'translateX(-50%)', background: '#111118', border: '1px solid #2a2a3a', borderRadius: 8, padding: '7px 14px', fontSize: 12, color: '#8888aa' }}>
+        )}
+        {currentUser.role === 'rep' && mapReady && (
+          <div style={{ position: 'absolute', bottom: 14, left: '50%', transform: 'translateX(-50%)', background: '#111118', border: '1px solid #2a2a3a', borderRadius: 8, padding: '7px 14px', fontSize: 12, color: '#8888aa', zIndex: 10 }}>
             📍 Tap the map to log a door
           </div>
         )}
