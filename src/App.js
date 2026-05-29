@@ -359,6 +359,7 @@ function MapView({ pins, setPins, currentUser, allUsers }) {
       agreement_signed: data.agreed,
       card_on_file: false,
       notes: data.notes,
+      pin_id: data.id || null,
     };
 
     if (data.id) {
@@ -444,14 +445,22 @@ function MapView({ pins, setPins, currentUser, allUsers }) {
       </div>
       {modal && <DoorLogModal pin={modal} onClose={() => setModal(null)} onSave={handleSave} techs={techs} onDelete={async (id) => {
         const pin = pins.find(p => p.id === id);
+        // Delete pin
         await supabase.from('pins').delete().eq('id', id);
         setPins(ps => ps.filter(p => p.id !== id));
-        // Also delete associated job
-        if (pin?.address) {
-          const { data: job } = await supabase.from('jobs').select('id').eq('address', pin.address).eq('rep_id', pin.rep_id).maybeSingle();
-          if (job) {
-            await supabase.from('jobs').delete().eq('id', job.id);
-            setJobs(js => js.filter(j => j.id !== job.id));
+        // Delete ALL jobs linked to this pin
+        if (pin) {
+          // Try by pin_id first, fallback to address+rep match
+          let query = supabase.from('jobs').select('id');
+          if (pin.id) {
+            const { data: byPinId } = await query.eq('pin_id', pin.id);
+            const { data: byAddress } = await supabase.from('jobs').select('id').eq('address', pin.address).eq('rep_id', pin.rep_id);
+            const allLinked = [...(byPinId || []), ...(byAddress || [])];
+            const uniqueIds = [...new Set(allLinked.map(j => j.id))];
+            if (uniqueIds.length > 0) {
+              await supabase.from('jobs').delete().in('id', uniqueIds);
+              setJobs(js => js.filter(j => !uniqueIds.includes(j.id)));
+            }
           }
         }
       }} />}
