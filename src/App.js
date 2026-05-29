@@ -270,18 +270,37 @@ function MapView({ pins, setPins, currentUser, allUsers }) {
         }, null, { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 });
       }
 
-      // Click to drop pin (reps only)
-      if (currentUser.role === 'rep') {
-        map.addListener('click', async (e) => {
-          const lat = e.latLng.lat();
-          const lng = e.latLng.lng();
-          const geocoder = new window.google.maps.Geocoder();
-          geocoder.geocode({ location: { lat, lng } }, (results, status) => {
-            const address = status === 'OK' && results[0] ? results[0].formatted_address : `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-            setModal({ lat, lng, address, rep_id: currentUser.id });
-          });
+      // Click to drop pin — works for rep and admin clicking on behalf
+      map.addListener('click', async (e) => {
+        if (currentUser.role === 'tech') return;
+        const lat = e.latLng.lat();
+        const lng = e.latLng.lng();
+
+        // Show temporary marker while geocoding
+        const tempMarker = new window.google.maps.Marker({
+          position: { lat, lng },
+          map,
+          icon: {
+            path: window.google.maps.SymbolPath.CIRCLE,
+            scale: 12,
+            fillColor: '#f59e0b',
+            fillOpacity: 0.8,
+            strokeColor: 'white',
+            strokeWeight: 2,
+          },
+          title: 'Loading address...',
+          animation: window.google.maps.Animation.BOUNCE,
         });
-      }
+
+        const geocoder = new window.google.maps.Geocoder();
+        geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+          tempMarker.setMap(null);
+          const address = status === 'OK' && results[0] 
+            ? results[0].formatted_address 
+            : `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+          setModal({ lat, lng, address, rep_id: currentUser.id });
+        });
+      });
       setMapReady(true);
     });
     return () => {
