@@ -112,7 +112,7 @@ function AuthScreen({ onLogin }) {
 }
 
 // ─── Door Log Modal ───────────────────────────────────────────────────────────
-function DoorLogModal({ pin, onClose, onSave, onDelete, techs }) {
+function DoorLogModal({ pin, onClose, onSave, onDelete, techs, allJobs }) {
   const nowTime = new Date().toTimeString().slice(0,5);
   const [form, setForm] = useState({
     address: pin?.address || '',
@@ -122,13 +122,30 @@ function DoorLogModal({ pin, onClose, onSave, onDelete, techs }) {
     price: pin?.price || '',
     notes: pin?.notes || '',
     follow_up_date: pin?.follow_up_date || new Date().toISOString().split('T')[0],
-    scheduled_time: pin?.scheduled_time || nowTime,
+    scheduled_time: pin?.scheduled_time || '',
     tech_id: pin?.tech_id || '',
     agreed: false,
   });
+  const [showTechPicker, setShowTechPicker] = useState(false);
   const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const showPlan = form.status === 'appointment' || form.status === 'closed';
+
+  const getBookedTimes = (techId, date) => {
+    if (!allJobs || !date) return [];
+    return allJobs.filter(j => j.tech_id === techId && j.scheduled_date === date && j.scheduled_time).map(j => j.scheduled_time);
+  };
+
+  const getAvailableSlots = (techId, date) => {
+    const booked = getBookedTimes(techId, date);
+    const slots = [];
+    for (let h = 8; h <= 17; h++) {
+      const time = `${h.toString().padStart(2,'0')}:00`;
+      const label = h === 12 ? '12:00 PM' : h > 12 ? `${h-12}:00 PM` : `${h}:00 AM`;
+      slots.push({ time, label, booked: booked.includes(time) });
+    }
+    return slots;
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -172,15 +189,63 @@ function DoorLogModal({ pin, onClose, onSave, onDelete, techs }) {
               {form.service === 'quarterly' && form.price && <div><label style={s.label}>Monthly Charge</label><div style={{ ...s.input, color: '#10b981', fontWeight: 700 }}>${(Number(form.price) / 3).toFixed(2)}/mo</div></div>}
             </div>
             <div style={{ marginBottom: 12 }}>
-              <label style={s.label}>Assign Technician</label>
-              <select style={s.select} value={form.tech_id} onChange={e => set('tech_id', e.target.value)}>
-                <option value="">— Select Tech —</option>
-                {techs.map((t, i) => <option key={t.id} value={t.id}>{t.name} · {i === 0 ? '⭐ Next available: Tomorrow 9AM' : 'Thu, 11AM'}</option>)}
-              </select>
+              <label style={s.label}>Scheduled Date</label>
+              <input style={s.input} type="date" value={form.follow_up_date} onChange={e => set('follow_up_date', e.target.value)} />
             </div>
-            <div style={s.twoCol}>
-              <div><label style={s.label}>Scheduled Date</label><input style={s.input} type="date" value={form.follow_up_date} onChange={e => set('follow_up_date', e.target.value)} /></div>
-              <div><label style={s.label}>Scheduled Time</label><input style={s.input} type="time" value={form.scheduled_time} onChange={e => set('scheduled_time', e.target.value)} /></div>
+
+            <div style={{ marginBottom: 12 }}>
+              <label style={s.label}>Assign Technician</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {techs.map(t => {
+                  const slots = getAvailableSlots(t.id, form.follow_up_date);
+                  const available = slots.filter(sl => !sl.booked).length;
+                  const isSelected = form.tech_id === t.id;
+                  return (
+                    <div key={t.id}>
+                      <div
+                        onClick={() => { set('tech_id', t.id); setShowTechPicker(isSelected ? null : t.id); }}
+                        style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: isSelected ? 'rgba(79,142,247,0.1)' : '#1a1a24', border: `1px solid ${isSelected ? '#4f8ef7' : '#2a2a3a'}`, borderRadius: 8, cursor: 'pointer' }}
+                      >
+                        <Avatar name={t.name} role="tech" size={28} />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600 }}>{t.name}</div>
+                          <div style={{ fontSize: 11, color: available > 0 ? '#10b981' : '#ef4444' }}>{available} slots open {form.follow_up_date ? 'this day' : '— pick a date first'}</div>
+                        </div>
+                        <span style={{ fontSize: 11, color: '#8888aa' }}>{isSelected ? '▲ Hide slots' : '▼ View slots'}</span>
+                      </div>
+                      {isSelected && (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 6, marginTop: 6, padding: '8px 0' }}>
+                          {slots.map(sl => (
+                            <div
+                              key={sl.time}
+                              onClick={() => !sl.booked && set('scheduled_time', sl.time)}
+                              style={{
+                                padding: '7px 6px',
+                                borderRadius: 7,
+                                textAlign: 'center',
+                                fontSize: 12,
+                                fontWeight: 600,
+                                cursor: sl.booked ? 'not-allowed' : 'pointer',
+                                background: form.scheduled_time === sl.time ? '#4f8ef7' : sl.booked ? '#1a1a24' : '#22222f',
+                                color: form.scheduled_time === sl.time ? 'white' : sl.booked ? '#333' : '#f0f0f8',
+                                border: `1px solid ${form.scheduled_time === sl.time ? '#4f8ef7' : sl.booked ? '#222' : '#2a2a3a'}`,
+                                textDecoration: sl.booked ? 'line-through' : 'none',
+                              }}
+                            >
+                              {sl.label}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {form.tech_id && form.scheduled_time && (
+                <div style={{ marginTop: 8, padding: '8px 12px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 8, fontSize: 12, color: '#10b981' }}>
+                  ✅ {techs.find(t => t.id === form.tech_id)?.name} · {form.scheduled_time} on {form.follow_up_date}
+                </div>
+              )}
             </div>
             <div style={{ background: '#1a1a24', border: '1px solid #2a2a3a', borderRadius: 8, padding: 12, fontSize: 11, color: '#8888aa', lineHeight: 1.7, maxHeight: 90, overflowY: 'auto', marginBottom: 10 }}>{AGREEMENT}</div>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 14 }}>
@@ -219,7 +284,7 @@ function loadGoogleMaps() {
   });
 }
 
-function MapView({ pins, setPins, currentUser, allUsers }) {
+function MapView({ pins, setPins, currentUser, allUsers, jobs }) {
   const [modal, setModal] = useState(null);
   const [mapReady, setMapReady] = useState(false);
   const mapDivRef = React.useRef(null);
@@ -392,6 +457,7 @@ function MapView({ pins, setPins, currentUser, allUsers }) {
         service: data.service || null, price: data.price || null,
         notes: data.notes, follow_up_date: data.follow_up_date || null,
         rep_id: data.rep_id, tech_id: data.tech_id || null, agreed: data.agreed,
+        pinned_at: new Date().toISOString(),
       }).select().single();
       setPins(ps => [...ps, inserted]);
 
@@ -443,7 +509,7 @@ function MapView({ pins, setPins, currentUser, allUsers }) {
           </div>
         )}
       </div>
-      {modal && <DoorLogModal pin={modal} onClose={() => setModal(null)} onSave={handleSave} techs={techs} onDelete={async (id) => {
+      {modal && <DoorLogModal pin={modal} onClose={() => setModal(null)} onSave={handleSave} techs={techs} allJobs={jobs} onDelete={async (id) => {
         const pin = pins.find(p => p.id === id);
         // Delete pin
         await supabase.from('pins').delete().eq('id', id);
@@ -930,7 +996,7 @@ export default function App() {
   const roleColor = { admin: '#4f8ef7', rep: '#10b981', tech: '#f59e0b' }[user.role];
 
   const renderPage = () => {
-    if (page === 'map') return <MapView pins={pins} setPins={setPins} currentUser={user} allUsers={allUsers} />;
+    if (page === 'map') return <MapView pins={pins} setPins={setPins} currentUser={user} allUsers={allUsers} jobs={jobs} />;
     if (page === 'schedule') return <ScheduleView jobs={jobs} setJobs={setJobs} currentUser={user} allUsers={allUsers} />;
     if (page === 'dashboard') return user.role === 'admin' ? <AdminDashboard pins={pins} jobs={jobs} allUsers={allUsers} /> : <RepDashboard pins={pins} jobs={jobs} currentUser={user} />;
     if (page === 'jobs') return <TechDashboard jobs={jobs} setJobs={setJobs} currentUser={user} />;
