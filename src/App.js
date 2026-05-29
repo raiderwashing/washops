@@ -36,6 +36,7 @@ const s = {
 
 const STATUS_CONFIG = {
   'not-interested': { label: 'Not Interested', color: '#ef4444', bg: 'rgba(239,68,68,0.15)' },
+  'not-home': { label: 'Not Home', color: '#e879f9', bg: 'rgba(232,121,249,0.15)' },
   'follow-up': { label: 'Follow Up', color: '#f59e0b', bg: 'rgba(245,158,11,0.15)' },
   appointment: { label: 'Appt Set', color: '#10b981', bg: 'rgba(16,185,129,0.15)' },
   closed: { label: 'Closed', color: '#4f8ef7', bg: 'rgba(79,142,247,0.15)' },
@@ -45,7 +46,7 @@ const STATUS_CONFIG = {
   cancelled: { label: 'Cancelled', color: '#ef4444', bg: 'rgba(239,68,68,0.15)' },
 };
 
-const PIN_COLORS = { 'not-interested': '#ef4444', 'follow-up': '#f59e0b', appointment: '#10b981', closed: '#4f8ef7', paid: '#7c3aed' };
+const PIN_COLORS = { 'not-interested': '#ef4444', 'not-home': '#e879f9', 'follow-up': '#f59e0b', appointment: '#10b981', closed: '#4f8ef7', paid: '#7c3aed' };
 
 const AGREEMENT = `WINDOW CLEANING SERVICE AGREEMENT — RAIDER WASHING
 
@@ -111,7 +112,8 @@ function AuthScreen({ onLogin }) {
 }
 
 // ─── Door Log Modal ───────────────────────────────────────────────────────────
-function DoorLogModal({ pin, onClose, onSave, techs }) {
+function DoorLogModal({ pin, onClose, onSave, onDelete, techs }) {
+  const nowTime = new Date().toTimeString().slice(0,5);
   const [form, setForm] = useState({
     address: pin?.address || '',
     name: pin?.name || '',
@@ -119,8 +121,8 @@ function DoorLogModal({ pin, onClose, onSave, techs }) {
     service: pin?.service || 'one-time',
     price: pin?.price || '',
     notes: pin?.notes || '',
-    follow_up_date: pin?.follow_up_date || '',
-    scheduled_time: pin?.scheduled_time || '',
+    follow_up_date: pin?.follow_up_date || new Date().toISOString().split('T')[0],
+    scheduled_time: pin?.scheduled_time || nowTime,
     tech_id: pin?.tech_id || '',
     agreed: false,
   });
@@ -151,6 +153,7 @@ function DoorLogModal({ pin, onClose, onSave, techs }) {
           <div><label style={s.label}>Status</label>
             <select style={s.select} value={form.status} onChange={e => set('status', e.target.value)}>
               <option value="follow-up">🟡 Follow Up</option>
+              <option value="not-home">🟣 Not Home</option>
               <option value="not-interested">🔴 Not Interested</option>
               <option value="appointment">🟢 Appt Set</option>
               <option value="closed">🔵 Closed</option>
@@ -190,6 +193,9 @@ function DoorLogModal({ pin, onClose, onSave, techs }) {
         <div style={{ marginBottom: 12 }}><label style={s.label}>Notes</label><textarea style={{ ...s.input, resize: 'vertical' }} rows={3} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Gate code, dog, # of windows, best time..." /></div>
         <div style={{ border: '2px dashed #2a2a3a', borderRadius: 8, padding: 16, textAlign: 'center', color: '#8888aa', fontSize: 13, cursor: 'pointer', marginBottom: 14 }}>📷 Add Before/After Photos (coming soon)</div>
         <div style={{ display: 'flex', gap: 8 }}>
+          {pin?.id && (
+            <button style={{ ...s.btnGhost, color: '#ef4444', borderColor: '#ef4444' }} onClick={() => { onDelete(pin.id); onClose(); }}>🗑</button>
+          )}
           <button style={{ ...s.btnGhost, flex: 1 }} onClick={onClose}>Cancel</button>
           <button style={{ ...s.btnAccent, flex: 2, padding: '10px' }} onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save Door Log'}</button>
         </div>
@@ -436,7 +442,10 @@ function MapView({ pins, setPins, currentUser, allUsers }) {
           </div>
         )}
       </div>
-      {modal && <DoorLogModal pin={modal} onClose={() => setModal(null)} onSave={handleSave} techs={techs} />}
+      {modal && <DoorLogModal pin={modal} onClose={() => setModal(null)} onSave={handleSave} techs={techs} onDelete={async (id) => {
+        await supabase.from('pins').delete().eq('id', id);
+        setPins(ps => ps.filter(p => p.id !== id));
+      }} />}
     </div>
   );
 }
@@ -486,7 +495,7 @@ function ScheduleView({ jobs, setJobs, currentUser, allUsers }) {
             return (
               <div key={i} style={{ background: isToday ? 'rgba(79,142,247,0.06)' : '#111118', padding: 8, minHeight: 72 }}>
                 <div style={{ fontSize: 11, fontWeight: 600, color: cell.valid ? '#8888aa' : '#333', marginBottom: 3 }}>{cell.valid ? cell.d : ''}</div>
-                {dj.slice(0, 2).map(j => <div key={j.id} onClick={() => setSelected(j)} style={{ background: 'rgba(79,142,247,0.15)', borderLeft: '2px solid #4f8ef7', padding: '2px 4px', borderRadius: 3, fontSize: 10, marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }}>{j.scheduled_time} · {j.customer_name?.split(' ')[0]}</div>)}
+                {dj.slice(0, 2).map(j => <div key={j.id} onClick={() => setSelected(j)} style={{ background: 'rgba(79,142,247,0.15)', borderLeft: '2px solid #4f8ef7', padding: '2px 4px', borderRadius: 3, fontSize: 10, marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }}>{j.scheduled_time || '—'} · {j.customer_name?.split(' ')[0] || 'Customer'}</div>)}
                 {dj.length > 2 && <div style={{ fontSize: 9, color: '#555570' }}>+{dj.length - 2}</div>}
               </div>
             );
@@ -516,7 +525,7 @@ function ScheduleView({ jobs, setJobs, currentUser, allUsers }) {
               <button onClick={() => setSelected(null)} style={{ background: '#1a1a24', border: 'none', color: '#8888aa', width: 28, height: 28, borderRadius: 6, cursor: 'pointer', fontSize: 16 }}>×</button>
             </div>
             <div style={s.twoCol}>
-              {[['Customer', selected.customer_name], ['Address', selected.address], ['Service', selected.service], ['Date', `${selected.scheduled_date || '—'} ${selected.scheduled_time || ''}`], ['Price', `$${selected.price}${selected.monthly_price ? ` ($${selected.monthly_price}/mo)` : ''}`]].map(([k, v]) => (
+              {[['Customer', selected.customer_name], ['Address', selected.address], ['Service', selected.service], ['Date', `${selected.scheduled_date || '—'} ${selected.scheduled_time ? '· ' + selected.scheduled_time : ''}`], ['Price', `$${selected.price}${selected.monthly_price ? ` ($${selected.monthly_price}/mo)` : ''}`]].map(([k, v]) => (
                 <div key={k}><div style={{ fontSize: 11, color: '#8888aa', marginBottom: 3 }}>{k}</div><div style={{ fontSize: 13, fontWeight: k === 'Price' ? 700 : 400, color: k === 'Price' ? '#10b981' : '#f0f0f8', textTransform: k === 'Service' ? 'capitalize' : 'none' }}>{v}</div></div>
               ))}
               <div><div style={{ fontSize: 11, color: '#8888aa', marginBottom: 3 }}>Status</div><Badge status={selected.status} /></div>
