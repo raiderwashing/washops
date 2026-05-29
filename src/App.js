@@ -348,7 +348,7 @@ function MapView({ pins, setPins, currentUser, allUsers, jobs }) {
 
       // Click to drop pin — works for rep and admin clicking on behalf
       map.addListener('click', async (e) => {
-        if (currentUser.role === 'tech') return;
+        if (currentUser.role === 'tech') return; // techs can't drop pins
         const lat = e.latLng.lat();
         const lng = e.latLng.lng();
 
@@ -374,7 +374,7 @@ function MapView({ pins, setPins, currentUser, allUsers, jobs }) {
           const address = status === 'OK' && results[0] 
             ? results[0].formatted_address 
             : `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-          setModal({ lat, lng, address, rep_id: currentUser.id });
+          setModal({ lat, lng, address, rep_id: currentUser.id, rep_name: currentUser.name });
         });
       });
       setMapReady(true);
@@ -526,7 +526,7 @@ function MapView({ pins, setPins, currentUser, allUsers, jobs }) {
             🎯 Find Me
           </button>
         )}
-        {currentUser.role === 'rep' && mapReady && (
+        {(currentUser.role === 'rep' || currentUser.role === 'admin') && mapReady && (
           <div style={{ position: 'absolute', bottom: 14, left: '50%', transform: 'translateX(-50%)', background: '#111118', border: '1px solid #2a2a3a', borderRadius: 8, padding: '7px 14px', fontSize: 12, color: '#8888aa', zIndex: 10 }}>
             📍 Tap any house to log a door
           </div>
@@ -828,7 +828,8 @@ function AdminDashboard({ pins, jobs, allUsers }) {
   const scheduled = jobs.filter(j => j.status === 'scheduled').length;
   const serviced = jobs.filter(j => j.status === 'serviced').length;
   const conv = pins.length ? Math.round(pins.filter(p => ['closed','paid','appointment'].includes(p.status)).length / pins.length * 100) : 0;
-  const repStats = reps.map(r => ({ ...r, knocked: pins.filter(p => p.rep_id === r.id).length, closed: pins.filter(p => p.rep_id === r.id && ['closed','paid'].includes(p.status)).length, rev: jobs.filter(j => j.rep_id === r.id && j.status === 'paid').reduce((s, j) => s + (j.price || 0), 0) }));
+  const knockers = [...reps, ...allUsers.filter(u => u.role === 'admin')];
+  const repStats = knockers.map(r => ({ ...r, knocked: pins.filter(p => p.rep_id === r.id).length, closed: pins.filter(p => p.rep_id === r.id && ['closed','paid'].includes(p.status)).length, rev: jobs.filter(j => j.rep_id === r.id && ['complete','paid'].includes(j.status)).reduce((s, j) => s + (j.price || 0), 0) })).filter(r => r.knocked > 0 || r.role === 'rep');
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -895,7 +896,7 @@ function AdminDashboard({ pins, jobs, allUsers }) {
 
 // ─── Rep Dashboard ────────────────────────────────────────────────────────────
 function RepDashboard({ pins, jobs, currentUser }) {
-  const my = pins.filter(p => p.rep_id === currentUser.id);
+  const my = pins.filter(p => p.rep_id === currentUser.id || (currentUser.role === 'admin' && p.rep_id === currentUser.id));
   const knocked = my.length, appts = my.filter(p => p.status === 'appointment').length, closed = my.filter(p => ['closed','paid'].includes(p.status)).length;
   const rev = jobs.filter(j => j.rep_id === currentUser.id && ['complete','paid'].includes(j.status)).reduce((s, j) => s + (j.price || 0), 0);
   return (
@@ -1142,7 +1143,7 @@ function TeamView({ allUsers, setAllUsers }) {
               </div>
               <div>
                 <label style={s.label}>Email</label>
-                <input style={s.input} value={form.email} onChange={e => set('email', e.target.value)} placeholder="jake@raiderwashing.com" disabled={!!editUser} />
+                <input style={s.input} value={form.email} onChange={e => set('email', e.target.value)} placeholder="jake@raiderwashing.com" />
               </div>
               <div>
                 <label style={s.label}>Phone</label>
