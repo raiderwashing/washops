@@ -120,6 +120,7 @@ function DoorLogModal({ pin, onClose, onSave, techs }) {
     price: pin?.price || '',
     notes: pin?.notes || '',
     follow_up_date: pin?.follow_up_date || '',
+    scheduled_time: pin?.scheduled_time || '',
     tech_id: pin?.tech_id || '',
     agreed: false,
   });
@@ -174,7 +175,10 @@ function DoorLogModal({ pin, onClose, onSave, techs }) {
                 {techs.map((t, i) => <option key={t.id} value={t.id}>{t.name} · {i === 0 ? '⭐ Next available: Tomorrow 9AM' : 'Thu, 11AM'}</option>)}
               </select>
             </div>
-            <div style={{ marginBottom: 14 }}><label style={s.label}>Scheduled Date</label><input style={s.input} type="date" value={form.follow_up_date} onChange={e => set('follow_up_date', e.target.value)} /></div>
+            <div style={s.twoCol}>
+              <div><label style={s.label}>Scheduled Date</label><input style={s.input} type="date" value={form.follow_up_date} onChange={e => set('follow_up_date', e.target.value)} /></div>
+              <div><label style={s.label}>Scheduled Time</label><input style={s.input} type="time" value={form.scheduled_time} onChange={e => set('scheduled_time', e.target.value)} /></div>
+            </div>
             <div style={{ background: '#1a1a24', border: '1px solid #2a2a3a', borderRadius: 8, padding: 12, fontSize: 11, color: '#8888aa', lineHeight: 1.7, maxHeight: 90, overflowY: 'auto', marginBottom: 10 }}>{AGREEMENT}</div>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 14 }}>
               <input type="checkbox" checked={form.agreed} onChange={e => set('agreed', e.target.checked)} style={{ marginTop: 2, accentColor: '#4f8ef7' }} />
@@ -335,17 +339,57 @@ function MapView({ pins, setPins, currentUser, allUsers }) {
   }, [visiblePins, mapReady]);
 
   const handleSave = async (data) => {
+    const jobPayload = {
+      address: data.address,
+      customer_name: data.name,
+      service: data.service,
+      price: data.price,
+      monthly_price: data.service === 'quarterly' ? data.price / 3 : null,
+      status: 'scheduled',
+      rep_id: data.rep_id,
+      tech_id: data.tech_id || null,
+      scheduled_date: data.follow_up_date || null,
+      scheduled_time: data.scheduled_time || null,
+      agreement_signed: data.agreed,
+      card_on_file: false,
+      notes: data.notes,
+    };
+
     if (data.id) {
-      const { data: updated } = await supabase.from('pins').update({ address: data.address, name: data.name, status: data.status, service: data.service, price: data.price, notes: data.notes, follow_up_date: data.follow_up_date || null, tech_id: data.tech_id || null, agreed: data.agreed }).eq('id', data.id).select().single();
+      // Update existing pin
+      const { data: updated } = await supabase.from('pins').update({
+        address: data.address, name: data.name, status: data.status,
+        service: data.service, price: data.price, notes: data.notes,
+        follow_up_date: data.follow_up_date || null,
+        tech_id: data.tech_id || null, agreed: data.agreed,
+      }).eq('id', data.id).select().single();
       setPins(ps => ps.map(p => p.id === data.id ? updated : p));
+
       if (['appointment', 'closed'].includes(data.status) && data.tech_id) {
-        await supabase.from('jobs').insert({ address: data.address, customer_name: data.name, service: data.service, price: data.price, monthly_price: data.service === 'quarterly' ? data.price / 3 : null, status: 'scheduled', rep_id: data.rep_id, tech_id: data.tech_id, scheduled_date: data.follow_up_date || null, agreement_signed: data.agreed, card_on_file: false, notes: data.notes });
+        // Check if job already exists for this pin to avoid duplicates
+        const { data: existingJob } = await supabase.from('jobs')
+          .select('id').eq('address', data.address).eq('rep_id', data.rep_id).maybeSingle();
+        if (existingJob) {
+          // Update existing job
+          await supabase.from('jobs').update(jobPayload).eq('id', existingJob.id);
+        } else {
+          // Create new job
+          await supabase.from('jobs').insert(jobPayload);
+        }
       }
     } else {
-      const { data: inserted } = await supabase.from('pins').insert({ lat: data.lat, lng: data.lng, x: 50, y: 50, address: data.address, name: data.name, status: data.status, service: data.service || null, price: data.price || null, notes: data.notes, follow_up_date: data.follow_up_date || null, rep_id: data.rep_id, tech_id: data.tech_id || null, agreed: data.agreed }).select().single();
+      // New pin
+      const { data: inserted } = await supabase.from('pins').insert({
+        lat: data.lat, lng: data.lng, x: 50, y: 50,
+        address: data.address, name: data.name, status: data.status,
+        service: data.service || null, price: data.price || null,
+        notes: data.notes, follow_up_date: data.follow_up_date || null,
+        rep_id: data.rep_id, tech_id: data.tech_id || null, agreed: data.agreed,
+      }).select().single();
       setPins(ps => [...ps, inserted]);
+
       if (['appointment', 'closed'].includes(data.status) && data.tech_id) {
-        await supabase.from('jobs').insert({ address: data.address, customer_name: data.name, service: data.service, price: data.price, monthly_price: data.service === 'quarterly' ? data.price / 3 : null, status: 'scheduled', rep_id: data.rep_id, tech_id: data.tech_id, scheduled_date: data.follow_up_date || null, agreement_signed: data.agreed, card_on_file: false, notes: data.notes });
+        await supabase.from('jobs').insert({ ...jobPayload, rep_id: data.rep_id });
       }
     }
   };
@@ -676,6 +720,28 @@ export default function App() {
       setLoading(false);
     };
     loadData();
+
+    // Real-time listeners
+    const pinsSub = supabase.channel('pins-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pins' }, (payload) => {
+        if (payload.eventType === 'INSERT') setPins(ps => [payload.new, ...ps]);
+        if (payload.eventType === 'UPDATE') setPins(ps => ps.map(p => p.id === payload.new.id ? payload.new : p));
+        if (payload.eventType === 'DELETE') setPins(ps => ps.filter(p => p.id !== payload.old.id));
+      })
+      .subscribe();
+
+    const jobsSub = supabase.channel('jobs-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, (payload) => {
+        if (payload.eventType === 'INSERT') setJobs(js => [payload.new, ...js]);
+        if (payload.eventType === 'UPDATE') setJobs(js => js.map(j => j.id === payload.new.id ? payload.new : j));
+        if (payload.eventType === 'DELETE') setJobs(js => js.filter(j => j.id !== payload.old.id));
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(pinsSub);
+      supabase.removeChannel(jobsSub);
+    };
   }, [user]);
 
   // Auth check on mount
