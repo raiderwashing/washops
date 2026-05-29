@@ -987,6 +987,196 @@ function CustomersView({ pins, jobs }) {
   );
 }
 
+
+// ─── Team View ────────────────────────────────────────────────────────────────
+function TeamView({ allUsers, setAllUsers }) {
+  const [showModal, setShowModal] = useState(false);
+  const [editUser, setEditUser] = useState(null);
+  const [form, setForm] = useState({ name: '', email: '', phone: '', role: 'rep', password: '', active: true });
+  const [saving, setSaving] = useState(false);
+  const [showPassFor, setShowPassFor] = useState(null);
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const openAdd = () => {
+    setEditUser(null);
+    setForm({ name: '', email: '', phone: '', role: 'rep', password: '', active: true });
+    setShowModal(true);
+  };
+
+  const openEdit = (user) => {
+    setEditUser(user);
+    setForm({ name: user.name, email: user.email, phone: user.phone || '', role: user.role, password: user.temp_password || '', active: user.active !== false });
+    setShowModal(true);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    if (editUser) {
+      // Update existing user
+      const { data: updated } = await supabase.from('users').update({
+        name: form.name,
+        phone: form.phone,
+        role: form.role,
+        temp_password: form.password,
+        active: form.active,
+      }).eq('id', editUser.id).select().single();
+      setAllUsers(us => us.map(u => u.id === editUser.id ? updated : u));
+    } else {
+      // Create auth user + users table entry
+      const { data: authData, error } = await supabase.auth.admin
+        ? await supabase.auth.signUp({ email: form.email, password: form.password })
+        : await supabase.auth.signUp({ email: form.email, password: form.password });
+      
+      // Insert into users table regardless
+      const { data: newUser } = await supabase.from('users').insert({
+        name: form.name,
+        email: form.email,
+        phone: form.phone,
+        role: form.role,
+        temp_password: form.password,
+        active: true,
+      }).select().single();
+      if (newUser) setAllUsers(us => [newUser, ...us]);
+    }
+    setSaving(false);
+    setShowModal(false);
+  };
+
+  const toggleActive = async (user) => {
+    const { data: updated } = await supabase.from('users').update({ active: !user.active }).eq('id', user.id).select().single();
+    setAllUsers(us => us.map(u => u.id === user.id ? updated : u));
+  };
+
+  const roleColor = { admin: '#4f8ef7', rep: '#10b981', tech: '#f59e0b' };
+
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={s.topbar}>
+        <div style={s.topbarTitle}>👥 Team Management</div>
+        <button style={s.btnAccent} onClick={openAdd}>+ Add Member</button>
+      </div>
+      <div style={s.page}>
+        {/* Stats */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 24 }}>
+          {[
+            { l: 'Total Members', v: allUsers.length, c: '#f0f0f8' },
+            { l: 'Reps', v: allUsers.filter(u => u.role === 'rep').length, c: '#10b981' },
+            { l: 'Technicians', v: allUsers.filter(u => u.role === 'tech').length, c: '#f59e0b' },
+          ].map((st, i) => (
+            <div key={i} style={s.card()}><div style={{ fontSize: 11, color: '#8888aa', marginBottom: 4 }}>{st.l}</div><div style={{ fontWeight: 800, fontSize: 26, color: st.c }}>{st.v}</div></div>
+          ))}
+        </div>
+
+        {/* Team Table */}
+        <div style={{ background: '#111118', border: '1px solid #2a2a3a', borderRadius: 12, overflow: 'hidden' }}>
+          <table style={s.table}>
+            <thead>
+              <tr>
+                <th style={s.th}>Member</th>
+                <th style={s.th}>Role</th>
+                <th style={s.th}>Email</th>
+                <th style={s.th}>Phone</th>
+                <th style={s.th}>Temp Password</th>
+                <th style={s.th}>Status</th>
+                <th style={s.th}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {allUsers.map(user => (
+                <tr key={user.id}>
+                  <td style={s.td}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <Avatar name={user.name} role={user.role} size={30} />
+                      <span style={{ fontWeight: 600 }}>{user.name}</span>
+                    </div>
+                  </td>
+                  <td style={s.td}>
+                    <span style={{ background: `${roleColor[user.role]}22`, color: roleColor[user.role], padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, textTransform: 'capitalize' }}>{user.role}</span>
+                  </td>
+                  <td style={{ ...s.td, fontSize: 12, color: '#8888aa' }}>{user.email}</td>
+                  <td style={{ ...s.td, fontSize: 12, color: '#8888aa' }}>{user.phone || '—'}</td>
+                  <td style={s.td}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 12, fontFamily: 'monospace', color: showPassFor === user.id ? '#f0f0f8' : '#555570', letterSpacing: showPassFor === user.id ? 0 : 2 }}>
+                        {showPassFor === user.id ? (user.temp_password || '—') : '••••••••'}
+                      </span>
+                      <button onClick={() => setShowPassFor(showPassFor === user.id ? null : user.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#8888aa', fontSize: 12 }}>
+                        {showPassFor === user.id ? '🙈' : '👁'}
+                      </button>
+                    </div>
+                  </td>
+                  <td style={s.td}>
+                    <span style={{ background: user.active !== false ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)', color: user.active !== false ? '#10b981' : '#ef4444', padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600 }}>
+                      {user.active !== false ? 'Active' : 'Inactive'}
+                    </span>
+                  </td>
+                  <td style={s.td}>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button style={{ ...s.btnGhost, padding: '5px 10px', fontSize: 11 }} onClick={() => openEdit(user)}>Edit</button>
+                      {user.role !== 'admin' && (
+                        <button onClick={() => toggleActive(user)} style={{ padding: '5px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: 'none', background: user.active !== false ? 'rgba(239,68,68,0.15)' : 'rgba(16,185,129,0.15)', color: user.active !== false ? '#ef4444' : '#10b981' }}>
+                          {user.active !== false ? 'Deactivate' : 'Reactivate'}
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Add/Edit Modal */}
+      {showModal && (
+        <div style={s.backdrop} onClick={e => e.target === e.currentTarget && setShowModal(false)}>
+          <div style={s.modal}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <div style={{ fontWeight: 700, fontSize: 17 }}>{editUser ? 'Edit Team Member' : 'Add Team Member'}</div>
+              <button onClick={() => setShowModal(false)} style={{ background: '#1a1a24', border: 'none', color: '#8888aa', width: 28, height: 28, borderRadius: 6, cursor: 'pointer', fontSize: 16 }}>×</button>
+            </div>
+            <div style={s.twoCol}>
+              <div style={{ gridColumn: '1/-1' }}>
+                <label style={s.label}>Full Name</label>
+                <input style={s.input} value={form.name} onChange={e => set('name', e.target.value)} placeholder="Jake Martinez" />
+              </div>
+              <div>
+                <label style={s.label}>Email</label>
+                <input style={s.input} value={form.email} onChange={e => set('email', e.target.value)} placeholder="jake@raiderwashing.com" disabled={!!editUser} />
+              </div>
+              <div>
+                <label style={s.label}>Phone</label>
+                <input style={s.input} value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="(806) 555-0123" />
+              </div>
+              <div>
+                <label style={s.label}>Role</label>
+                <select style={s.select} value={form.role} onChange={e => set('role', e.target.value)}>
+                  <option value="rep">Rep</option>
+                  <option value="tech">Technician</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+              <div>
+                <label style={s.label}>Temp Password</label>
+                <input style={s.input} value={form.password} onChange={e => set('password', e.target.value)} placeholder="bobo1234" />
+              </div>
+            </div>
+            {!editUser && (
+              <div style={{ background: '#1a1a24', borderRadius: 8, padding: 12, fontSize: 12, color: '#8888aa', marginBottom: 14, lineHeight: 1.6 }}>
+                ⚠️ After adding, go to <strong style={{ color: '#f0f0f8' }}>Supabase → Auth → Users</strong> and manually create their login with the same email and temp password.
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button style={{ ...s.btnGhost, flex: 1 }} onClick={() => setShowModal(false)}>Cancel</button>
+              <button style={{ ...s.btnAccent, flex: 2, padding: 10 }} onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : editUser ? 'Save Changes' : 'Add Member'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main App ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [user, setUser] = useState(null);
@@ -1051,7 +1241,7 @@ export default function App() {
   if (!user) return <AuthScreen onLogin={u => { setUser(u); setPage(u.role === 'tech' ? 'jobs' : u.role === 'admin' ? 'dashboard' : 'map'); }} />;
 
   const NAV = {
-    admin: [{ id: 'dashboard', icon: '📊', label: 'Dashboard' }, { id: 'map', icon: '🗺', label: 'Field Map' }, { id: 'schedule', icon: '📅', label: 'Schedule' }, { id: 'customers', icon: '👥', label: 'Customers' }],
+    admin: [{ id: 'dashboard', icon: '📊', label: 'Dashboard' }, { id: 'map', icon: '🗺', label: 'Field Map' }, { id: 'schedule', icon: '📅', label: 'Schedule' }, { id: 'customers', icon: '👥', label: 'Customers' }, { id: 'team', icon: '🧑‍💼', label: 'Team' }],
     rep: [{ id: 'map', icon: '🗺', label: 'Field Map' }, { id: 'schedule', icon: '📅', label: 'Schedule' }, { id: 'dashboard', icon: '📈', label: 'My Stats' }, { id: 'customers', icon: '👥', label: 'Customers' }],
     tech: [{ id: 'jobs', icon: '🔧', label: 'My Jobs' }, { id: 'schedule', icon: '📅', label: 'Schedule' }],
   };
@@ -1064,6 +1254,7 @@ export default function App() {
     if (page === 'dashboard') return user.role === 'admin' ? <AdminDashboard pins={pins} jobs={jobs} allUsers={allUsers} /> : <RepDashboard pins={pins} jobs={jobs} currentUser={user} />;
     if (page === 'jobs') return <TechDashboard jobs={jobs} setJobs={setJobs} currentUser={user} />;
     if (page === 'customers') return <CustomersView pins={pins} jobs={jobs} />;
+    if (page === 'team') return <TeamView allUsers={allUsers} setAllUsers={setAllUsers} />;
     return null;
   };
 
