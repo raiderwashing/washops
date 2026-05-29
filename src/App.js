@@ -443,8 +443,17 @@ function MapView({ pins, setPins, currentUser, allUsers }) {
         )}
       </div>
       {modal && <DoorLogModal pin={modal} onClose={() => setModal(null)} onSave={handleSave} techs={techs} onDelete={async (id) => {
+        const pin = pins.find(p => p.id === id);
         await supabase.from('pins').delete().eq('id', id);
         setPins(ps => ps.filter(p => p.id !== id));
+        // Also delete associated job
+        if (pin?.address) {
+          const { data: job } = await supabase.from('jobs').select('id').eq('address', pin.address).eq('rep_id', pin.rep_id).maybeSingle();
+          if (job) {
+            await supabase.from('jobs').delete().eq('id', job.id);
+            setJobs(js => js.filter(j => j.id !== job.id));
+          }
+        }
       }} />}
     </div>
   );
@@ -453,30 +462,177 @@ function MapView({ pins, setPins, currentUser, allUsers }) {
 // ─── Schedule View ────────────────────────────────────────────────────────────
 function ScheduleView({ jobs, setJobs, currentUser, allUsers }) {
   const [selected, setSelected] = useState(null);
+  const [view, setView] = useState('month'); // month | week | day
+  const [currentDate, setCurrentDate] = useState(new Date());
   const today = new Date();
-  const startDay = new Date(today.getFullYear(), today.getMonth(), 1).getDay();
-  const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
-  const cells = Array.from({ length: 35 }, (_, i) => { const d = i - startDay + 1; return { d, valid: d >= 1 && d <= daysInMonth }; });
-  const dayJobs = (d) => jobs.filter(j => { if (!j.scheduled_date) return false; const dt = new Date(j.scheduled_date); return dt.getDate() === d && dt.getMonth() === today.getMonth(); });
   const visible = currentUser.role === 'admin' ? jobs : currentUser.role === 'rep' ? jobs.filter(j => j.rep_id === currentUser.id) : jobs.filter(j => j.tech_id === currentUser.id);
   const techs = allUsers.filter(u => u.role === 'tech');
 
   const markComplete = async (job) => {
-    const { data: updated } = await supabase.from('jobs').update({ status: 'paid', completed_date: new Date().toISOString().split('T')[0] }).eq('id', job.id).select().single();
+    const now = new Date();
+    const { data: updated } = await supabase.from('jobs').update({
+      status: 'paid',
+      completed_date: now.toISOString().split('T')[0],
+      scheduled_time: job.scheduled_time || now.toTimeString().slice(0,5),
+    }).eq('id', job.id).select().single();
     setJobs(js => js.map(j => j.id === job.id ? updated : j));
     setSelected(null);
+  };
+
+  const jobsForDate = (date) => visible.filter(j => {
+    if (!j.scheduled_date) return false;
+    const jd = new Date(j.scheduled_date + 'T00:00:00');
+    return jd.toDateString() === date.toDateString();
+  });
+
+  const navigate = (dir) => {
+    const d = new Date(currentDate);
+    if (view === 'month') d.setMonth(d.getMonth() + dir);
+    if (view === 'week') d.setDate(d.getDate() + dir * 7);
+    if (view === 'day') d.setDate(d.getDate() + dir);
+    setCurrentDate(d);
+  };
+
+  const headerLabel = () => {
+    if (view === 'month') return currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+    if (view === 'week') {
+      const start = new Date(currentDate);
+      start.setDate(start.getDate() - start.getDay());
+      const end = new Date(start); end.setDate(end.getDate() + 6);
+      return `${start.toLocaleDateString('default', { month: 'short', day: 'numeric' })} – ${end.toLocaleDateString('default', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+    }
+    return currentDate.toLocaleDateString('default', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  };
+
+  // MONTH VIEW
+  const MonthView = () => {
+    const startDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).getDay();
+    const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
+    const cells = Array.from({ length: 35 }, (_, i) => {
+      const d = i - startDay + 1;
+      return { d, valid: d >= 1 && d <= daysInMonth };
+    });
+    return (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 1, background: '#2a2a3a', borderRadius: 10, overflow: 'hidden', marginBottom: 20 }}>
+        {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => <div key={d} style={{ background: '#1a1a24', padding: '8px 10px', textAlign: 'center', fontSize: 11, fontWeight: 600, color: '#555570', textTransform: 'uppercase' }}>{d}</div>)}
+        {cells.map((cell, i) => {
+          if (!cell.valid) return <div key={i} style={{ background: '#0e0e16', minHeight: 72 }} />;
+          const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), cell.d);
+          const dj = jobsForDate(date);
+          const isToday = date.toDateString() === today.toDateString();
+          return (
+            <div key={i} style={{ background: isToday ? 'rgba(79,142,247,0.08)' : '#111118', padding: 8, minHeight: 72, cursor: dj.length ? 'pointer' : 'default' }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: isToday ? '#4f8ef7' : '#8888aa', marginBottom: 3 }}>{cell.d}</div>
+              {dj.slice(0, 2).map(j => (
+                <div key={j.id} onClick={() => setSelected(j)} style={{ background: 'rgba(79,142,247,0.15)', borderLeft: '2px solid #4f8ef7', padding: '2px 5px', borderRadius: 3, fontSize: 10, marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }}>
+                  {j.scheduled_time || ''} {j.customer_name?.split(' ')[0] || 'Job'}
+                </div>
+              ))}
+              {dj.length > 2 && <div style={{ fontSize: 9, color: '#555570' }}>+{dj.length - 2} more</div>}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  // WEEK VIEW
+  const WeekView = () => {
+    const startOfWeek = new Date(currentDate);
+    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+    const weekDays = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(startOfWeek); d.setDate(d.getDate() + i); return d;
+    });
+    return (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 1, background: '#2a2a3a', borderRadius: 10, overflow: 'hidden', marginBottom: 20 }}>
+        {weekDays.map((date, i) => {
+          const dj = jobsForDate(date);
+          const isToday = date.toDateString() === today.toDateString();
+          return (
+            <div key={i} style={{ background: '#1a1a24' }}>
+              <div style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #2a2a3a', background: isToday ? 'rgba(79,142,247,0.1)' : '#1a1a24' }}>
+                <div style={{ fontSize: 10, color: '#555570', textTransform: 'uppercase' }}>{date.toLocaleString('default', { weekday: 'short' })}</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: isToday ? '#4f8ef7' : '#f0f0f8' }}>{date.getDate()}</div>
+              </div>
+              <div style={{ padding: 6, minHeight: 120 }}>
+                {dj.map(j => (
+                  <div key={j.id} onClick={() => setSelected(j)} style={{ background: 'rgba(79,142,247,0.15)', borderLeft: '2px solid #4f8ef7', padding: '4px 6px', borderRadius: 4, fontSize: 11, marginBottom: 4, cursor: 'pointer' }}>
+                    <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{j.customer_name?.split(' ')[0]}</div>
+                    <div style={{ color: '#8888aa', fontSize: 10 }}>{j.scheduled_time || 'No time'}</div>
+                  </div>
+                ))}
+                {dj.length === 0 && <div style={{ color: '#333', fontSize: 11, textAlign: 'center', paddingTop: 16 }}>—</div>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  // DAY VIEW
+  const DayView = () => {
+    const hours = Array.from({ length: 13 }, (_, i) => i + 7); // 7am to 7pm
+    const dj = jobsForDate(currentDate);
+    const getHour = (time) => {
+      if (!time) return null;
+      const [h] = time.split(':').map(Number);
+      return h;
+    };
+    return (
+      <div style={{ background: '#111118', border: '1px solid #2a2a3a', borderRadius: 10, overflow: 'hidden', marginBottom: 20 }}>
+        {dj.length === 0 && (
+          <div style={{ padding: 40, textAlign: 'center', color: '#555570' }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>
+            <div>No jobs scheduled for this day</div>
+          </div>
+        )}
+        {hours.map(hour => {
+          const hourJobs = dj.filter(j => getHour(j.scheduled_time) === hour);
+          const label = hour === 12 ? '12 PM' : hour > 12 ? `${hour-12} PM` : `${hour} AM`;
+          return (
+            <div key={hour} style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.04)', minHeight: 52 }}>
+              <div style={{ width: 64, padding: '8px 12px', fontSize: 11, color: '#555570', borderRight: '1px solid #2a2a3a', flexShrink: 0, paddingTop: 10 }}>{label}</div>
+              <div style={{ flex: 1, padding: '6px 10px' }}>
+                {hourJobs.map(j => (
+                  <div key={j.id} onClick={() => setSelected(j)} style={{ background: 'rgba(79,142,247,0.15)', borderLeft: '3px solid #4f8ef7', padding: '6px 10px', borderRadius: 6, marginBottom: 4, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 13 }}>{j.customer_name}</div>
+                      <div style={{ fontSize: 11, color: '#8888aa' }}>{j.address} · {j.service}</div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <Badge status={j.status} />
+                      <div style={{ fontSize: 11, color: '#10b981', fontWeight: 700, marginTop: 2 }}>${j.price}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
   };
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <div style={s.topbar}>
-        <div style={s.topbarTitle}>📅 Schedule — {today.toLocaleString('default', { month: 'long', year: 'numeric' })}</div>
-        <span style={{ fontSize: 12, color: '#8888aa' }}>{visible.length} jobs</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button onClick={() => navigate(-1)} style={{ ...s.btnGhost, padding: '4px 10px' }}>‹</button>
+          <div style={{ fontWeight: 700, fontSize: 14, minWidth: 200, textAlign: 'center' }}>{headerLabel()}</div>
+          <button onClick={() => navigate(1)} style={{ ...s.btnGhost, padding: '4px 10px' }}>›</button>
+          <button onClick={() => setCurrentDate(new Date())} style={{ ...s.btnGhost, fontSize: 11 }}>Today</button>
+        </div>
+        <div style={{ display: 'flex', gap: 4 }}>
+          {['month','week','day'].map(v => (
+            <button key={v} onClick={() => setView(v)} style={{ ...s.btnGhost, background: view === v ? '#4f8ef7' : '#1a1a24', color: view === v ? 'white' : '#8888aa', border: 'none', textTransform: 'capitalize', fontSize: 12 }}>{v}</button>
+          ))}
+        </div>
       </div>
       <div style={s.page}>
         {currentUser.role === 'rep' && (
           <div style={{ ...s.card(), marginBottom: 20 }}>
-            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 12 }}>🧑‍🔧 Tech Availability — Nearest Slots</div>
+            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 12 }}>🧑‍🔧 Tech Availability</div>
             {techs.map((t, i) => (
               <div key={t.id} style={s.techSlot(i === 0)}>
                 <Avatar name={t.name} role="tech" size={26} />
@@ -487,29 +643,18 @@ function ScheduleView({ jobs, setJobs, currentUser, allUsers }) {
             ))}
           </div>
         )}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 1, background: '#2a2a3a', borderRadius: 10, overflow: 'hidden', marginBottom: 20 }}>
-          {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => <div key={d} style={{ background: '#1a1a24', padding: '8px 10px', textAlign: 'center', fontSize: 11, fontWeight: 600, color: '#555570', textTransform: 'uppercase' }}>{d}</div>)}
-          {cells.map((cell, i) => {
-            const dj = cell.valid ? dayJobs(cell.d) : [];
-            const isToday = cell.d === today.getDate();
-            return (
-              <div key={i} style={{ background: isToday ? 'rgba(79,142,247,0.06)' : '#111118', padding: 8, minHeight: 72 }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: cell.valid ? '#8888aa' : '#333', marginBottom: 3 }}>{cell.valid ? cell.d : ''}</div>
-                {dj.slice(0, 2).map(j => <div key={j.id} onClick={() => setSelected(j)} style={{ background: 'rgba(79,142,247,0.15)', borderLeft: '2px solid #4f8ef7', padding: '2px 4px', borderRadius: 3, fontSize: 10, marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }}>{j.scheduled_time || '—'} · {j.customer_name?.split(' ')[0] || 'Customer'}</div>)}
-                {dj.length > 2 && <div style={{ fontSize: 9, color: '#555570' }}>+{dj.length - 2}</div>}
-              </div>
-            );
-          })}
-        </div>
+        {view === 'month' && <MonthView />}
+        {view === 'week' && <WeekView />}
+        {view === 'day' && <DayView />}
         <div style={{ background: '#111118', border: '1px solid #2a2a3a', borderRadius: 12, overflow: 'hidden' }}>
           <div style={{ padding: '14px 16px', borderBottom: '1px solid #2a2a3a', fontWeight: 700, fontSize: 14 }}>All Jobs</div>
           <table style={s.table}>
-            <thead><tr><th style={s.th}>Customer</th><th style={s.th}>Service</th><th style={s.th}>Date</th><th style={s.th}>Status</th><th style={s.th}>Price</th></tr></thead>
+            <thead><tr><th style={s.th}>Customer</th><th style={s.th}>Service</th><th style={s.th}>Date · Time</th><th style={s.th}>Status</th><th style={s.th}>Price</th></tr></thead>
             <tbody>{visible.map(j => (
               <tr key={j.id} style={{ cursor: 'pointer' }} onClick={() => setSelected(j)}>
                 <td style={s.td}>{j.customer_name}</td>
                 <td style={{ ...s.td, textTransform: 'capitalize', fontSize: 12 }}>{j.service}</td>
-                <td style={{ ...s.td, fontSize: 12, color: '#8888aa' }}>{j.scheduled_date} {j.scheduled_time && `· ${j.scheduled_time}`}</td>
+                <td style={{ ...s.td, fontSize: 12, color: '#8888aa' }}>{j.scheduled_date || '—'} {j.scheduled_time && `· ${j.scheduled_time}`}</td>
                 <td style={s.td}><Badge status={j.status} /></td>
                 <td style={{ ...s.td, fontWeight: 700 }}>${j.price}</td>
               </tr>
@@ -525,7 +670,7 @@ function ScheduleView({ jobs, setJobs, currentUser, allUsers }) {
               <button onClick={() => setSelected(null)} style={{ background: '#1a1a24', border: 'none', color: '#8888aa', width: 28, height: 28, borderRadius: 6, cursor: 'pointer', fontSize: 16 }}>×</button>
             </div>
             <div style={s.twoCol}>
-              {[['Customer', selected.customer_name], ['Address', selected.address], ['Service', selected.service], ['Date', `${selected.scheduled_date || '—'} ${selected.scheduled_time ? '· ' + selected.scheduled_time : ''}`], ['Price', `$${selected.price}${selected.monthly_price ? ` ($${selected.monthly_price}/mo)` : ''}`]].map(([k, v]) => (
+              {[['Customer', selected.customer_name], ['Address', selected.address], ['Service', selected.service], ['Scheduled', `${selected.scheduled_date || '—'} ${selected.scheduled_time ? '· ' + selected.scheduled_time : ''}`], ['Price', `$${selected.price}${selected.monthly_price ? ` ($${selected.monthly_price}/mo)` : ''}`], ['Completed', selected.completed_date || '—']].map(([k, v]) => (
                 <div key={k}><div style={{ fontSize: 11, color: '#8888aa', marginBottom: 3 }}>{k}</div><div style={{ fontSize: 13, fontWeight: k === 'Price' ? 700 : 400, color: k === 'Price' ? '#10b981' : '#f0f0f8', textTransform: k === 'Service' ? 'capitalize' : 'none' }}>{v}</div></div>
               ))}
               <div><div style={{ fontSize: 11, color: '#8888aa', marginBottom: 3 }}>Status</div><Badge status={selected.status} /></div>
