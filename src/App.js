@@ -438,16 +438,38 @@ function MapView({ pins, setPins, currentUser, allUsers, jobs }) {
       }).eq('id', data.id).select().single();
       setPins(ps => ps.map(p => p.id === data.id ? updated : p));
 
-      if (['appointment', 'closed'].includes(data.status) && data.tech_id) {
-        // Check if job already exists for this pin to avoid duplicates
-        const { data: existingJob } = await supabase.from('jobs')
-          .select('id').eq('address', data.address).eq('rep_id', data.rep_id).maybeSingle();
+      // Find existing job for this pin
+      const { data: existingJob } = await supabase.from('jobs')
+        .select('id, status').eq('address', data.address).eq('rep_id', data.rep_id).maybeSingle();
+
+      if (data.status === 'closed') {
+        // Pin closed = job moves to serviced
+        const now = new Date();
         if (existingJob) {
-          // Update existing job
-          await supabase.from('jobs').update(jobPayload).eq('id', existingJob.id);
+          const { data: updatedJob } = await supabase.from('jobs').update({
+            status: 'serviced',
+            completed_date: now.toISOString().split('T')[0],
+            tech_id: data.tech_id || existingJob.tech_id || null,
+            price: data.price || 0,
+            service: data.service,
+          }).eq('id', existingJob.id).select().single();
+          setJobs(js => js.map(j => j.id === existingJob.id ? updatedJob : j));
         } else {
-          // Create new job
-          await supabase.from('jobs').insert(jobPayload);
+          // No job yet — create one as serviced
+          const { data: newJob } = await supabase.from('jobs').insert({
+            ...jobPayload,
+            status: 'serviced',
+            completed_date: now.toISOString().split('T')[0],
+          }).select().single();
+          setJobs(js => [newJob, ...js]);
+        }
+      } else if (['appointment'].includes(data.status) && data.tech_id) {
+        if (existingJob) {
+          await supabase.from('jobs').update(jobPayload).eq('id', existingJob.id);
+          setJobs(js => js.map(j => j.id === existingJob.id ? { ...j, ...jobPayload } : j));
+        } else {
+          const { data: newJob } = await supabase.from('jobs').insert(jobPayload).select().single();
+          setJobs(js => [newJob, ...js]);
         }
       }
     } else {
