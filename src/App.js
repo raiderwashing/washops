@@ -212,46 +212,69 @@ function loadGoogleMaps() {
 function MapView({ pins, setPins, currentUser, allUsers }) {
   const [modal, setModal] = useState(null);
   const [mapReady, setMapReady] = useState(false);
-  const mapRef = useEffect;
   const mapDivRef = React.useRef(null);
   const googleMapRef = React.useRef(null);
   const markersRef = React.useRef([]);
+  const locationMarkerRef = React.useRef(null);
+  const locationWatchRef = React.useRef(null);
   const techs = allUsers.filter(u => u.role === 'tech');
   const visiblePins = currentUser.role === 'admin' ? pins : pins.filter(p => p.rep_id === currentUser.id);
 
-  // Load Google Maps and init
   useEffect(() => {
     loadGoogleMaps().then(() => {
       if (!mapDivRef.current) return;
       const map = new window.google.maps.Map(mapDivRef.current, {
         center: LUBBOCK_CENTER,
-        zoom: 13,
-        styles: [
-          { elementType: 'geometry', stylers: [{ color: '#1a1a24' }] },
-          { elementType: 'labels.text.stroke', stylers: [{ color: '#111118' }] },
-          { elementType: 'labels.text.fill', stylers: [{ color: '#8888aa' }] },
-          { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#2a2a3a' }] },
-          { featureType: 'road.arterial', elementType: 'labels.text.fill', stylers: [{ color: '#6666aa' }] },
-          { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#3a3a50' }] },
-          { featureType: 'road.highway', elementType: 'labels.text.fill', stylers: [{ color: '#4f8ef7' }] },
-          { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0a0a0f' }] },
-          { featureType: 'poi', stylers: [{ visibility: 'off' }] },
-          { featureType: 'transit', stylers: [{ visibility: 'off' }] },
-        ],
+        zoom: 18,
+        mapTypeId: 'hybrid',
+        tilt: 0,
         disableDefaultUI: false,
         zoomControl: true,
-        mapTypeControl: false,
+        mapTypeControl: true,
+        mapTypeControlOptions: {
+          mapTypeIds: ['hybrid', 'roadmap'],
+          style: window.google.maps.MapTypeControlStyle.DROPDOWN_MENU,
+        },
         streetViewControl: false,
-        fullscreenControl: false,
+        fullscreenControl: true,
       });
       googleMapRef.current = map;
+
+      // Live location tracking
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(pos => {
+          const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          map.panTo(loc);
+          map.setZoom(18);
+        });
+        locationWatchRef.current = navigator.geolocation.watchPosition(pos => {
+          const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          if (locationMarkerRef.current) {
+            locationMarkerRef.current.setPosition(loc);
+          } else {
+            locationMarkerRef.current = new window.google.maps.Marker({
+              position: loc,
+              map,
+              icon: {
+                path: window.google.maps.SymbolPath.CIRCLE,
+                scale: 10,
+                fillColor: '#4f8ef7',
+                fillOpacity: 1,
+                strokeColor: 'white',
+                strokeWeight: 3,
+              },
+              title: 'You are here',
+              zIndex: 999,
+            });
+          }
+        }, null, { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 });
+      }
 
       // Click to drop pin (reps only)
       if (currentUser.role === 'rep') {
         map.addListener('click', async (e) => {
           const lat = e.latLng.lat();
           const lng = e.latLng.lng();
-          // Reverse geocode to get address
           const geocoder = new window.google.maps.Geocoder();
           geocoder.geocode({ location: { lat, lng } }, (results, status) => {
             const address = status === 'OK' && results[0] ? results[0].formatted_address : `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
@@ -261,6 +284,9 @@ function MapView({ pins, setPins, currentUser, allUsers }) {
       }
       setMapReady(true);
     });
+    return () => {
+      if (locationWatchRef.current) navigator.geolocation.clearWatch(locationWatchRef.current);
+    };
   }, []);
 
   // Render pins as markers on the map
@@ -326,9 +352,24 @@ function MapView({ pins, setPins, currentUser, allUsers }) {
             Loading map...
           </div>
         )}
+        {mapReady && (
+          <button onClick={() => {
+            if (locationMarkerRef.current) {
+              googleMapRef.current.panTo(locationMarkerRef.current.getPosition());
+              googleMapRef.current.setZoom(18);
+            } else if (navigator.geolocation) {
+              navigator.geolocation.getCurrentPosition(pos => {
+                googleMapRef.current.panTo({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+                googleMapRef.current.setZoom(18);
+              });
+            }
+          }} style={{ position: 'absolute', top: 60, right: 10, background: '#111118', border: '1px solid #2a2a3a', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#4f8ef7', cursor: 'pointer', zIndex: 10, fontWeight: 600, boxShadow: '0 2px 8px rgba(0,0,0,0.4)' }}>
+            🎯 Find Me
+          </button>
+        )}
         {currentUser.role === 'rep' && mapReady && (
           <div style={{ position: 'absolute', bottom: 14, left: '50%', transform: 'translateX(-50%)', background: '#111118', border: '1px solid #2a2a3a', borderRadius: 8, padding: '7px 14px', fontSize: 12, color: '#8888aa', zIndex: 10 }}>
-            📍 Tap the map to log a door
+            📍 Tap any house to log a door
           </div>
         )}
       </div>
