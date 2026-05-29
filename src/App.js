@@ -285,7 +285,7 @@ function loadGoogleMaps() {
   });
 }
 
-function MapView({ pins, setPins, currentUser, allUsers, jobs }) {
+function MapView({ pins, setPins, currentUser, allUsers, jobs, setJobs }) {
   const [modal, setModal] = useState(null);
   const [mapReady, setMapReady] = useState(false);
   const mapDivRef = React.useRef(null);
@@ -1250,7 +1250,7 @@ export default function App() {
   const roleColor = { admin: '#4f8ef7', rep: '#10b981', tech: '#f59e0b' }[user.role];
 
   const renderPage = () => {
-    if (page === 'map') return <MapView pins={pins} setPins={setPins} currentUser={user} allUsers={allUsers} jobs={jobs} />;
+    if (page === 'map') return <MapView pins={pins} setPins={setPins} currentUser={user} allUsers={allUsers} jobs={jobs} setJobs={setJobs} />;
     if (page === 'schedule') return <ScheduleView jobs={jobs} setJobs={setJobs} currentUser={user} allUsers={allUsers} />;
     if (page === 'dashboard') return user.role === 'admin' ? <AdminDashboard pins={pins} jobs={jobs} allUsers={allUsers} /> : <RepDashboard pins={pins} jobs={jobs} currentUser={user} />;
     if (page === 'jobs') return <TechDashboard jobs={jobs} setJobs={setJobs} currentUser={user} />;
