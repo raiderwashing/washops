@@ -556,8 +556,12 @@ function ScheduleView({ jobs, setJobs, currentUser, allUsers }) {
 
   const jobsForDate = (date) => visible.filter(j => {
     if (!j.scheduled_date) return false;
-    const jd = new Date(j.scheduled_date + 'T00:00:00');
-    return jd.toDateString() === date.toDateString();
+    // Compare as plain date strings to avoid timezone issues
+    const jDate = j.scheduled_date.slice(0, 10);
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return jDate === `${y}-${m}-${d}`;
   });
 
   const navigate = (dir) => {
@@ -750,6 +754,12 @@ function ScheduleView({ jobs, setJobs, currentUser, allUsers }) {
               ))}
               <div><div style={{ fontSize: 11, color: '#8888aa', marginBottom: 3 }}>Status</div><Badge status={selected.status} /></div>
             </div>
+            {selected.notes && (
+              <div style={{ marginBottom: 14, padding: '10px 14px', background: '#1a1a24', borderRadius: 8, borderLeft: '3px solid #f59e0b' }}>
+                <div style={{ fontSize: 11, color: '#8888aa', marginBottom: 4 }}>📝 Notes</div>
+                <div style={{ fontSize: 13, color: '#f0f0f8', lineHeight: 1.6 }}>{selected.notes}</div>
+              </div>
+            )}
             <div style={{ marginTop: 14 }}>
               <div style={{ fontSize: 11, color: '#8888aa', marginBottom: 8 }}>Photo Documentation</div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8 }}>
