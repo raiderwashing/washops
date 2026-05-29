@@ -40,9 +40,10 @@ const STATUS_CONFIG = {
   'follow-up': { label: 'Follow Up', color: '#f59e0b', bg: 'rgba(245,158,11,0.15)' },
   appointment: { label: 'Appt Set', color: '#10b981', bg: 'rgba(16,185,129,0.15)' },
   closed: { label: 'Closed', color: '#4f8ef7', bg: 'rgba(79,142,247,0.15)' },
-  paid: { label: 'Paid', color: '#7c3aed', bg: 'rgba(124,58,237,0.15)' },
   scheduled: { label: 'Scheduled', color: '#4f8ef7', bg: 'rgba(79,142,247,0.15)' },
-  complete: { label: 'Complete', color: '#10b981', bg: 'rgba(16,185,129,0.15)' },
+  serviced: { label: 'Serviced', color: '#10b981', bg: 'rgba(16,185,129,0.15)' },
+  complete: { label: '⭐ Complete ⭐', color: '#f59e0b', bg: 'rgba(245,158,11,0.15)' },
+  paid: { label: '⭐ Complete ⭐', color: '#f59e0b', bg: 'rgba(245,158,11,0.15)' },
   cancelled: { label: 'Cancelled', color: '#ef4444', bg: 'rgba(239,68,68,0.15)' },
 };
 
@@ -543,13 +544,19 @@ function ScheduleView({ jobs, setJobs, currentUser, allUsers }) {
   const visible = currentUser.role === 'admin' ? jobs : currentUser.role === 'rep' ? jobs.filter(j => j.rep_id === currentUser.id) : jobs.filter(j => j.tech_id === currentUser.id);
   const techs = allUsers.filter(u => u.role === 'tech');
 
-  const markComplete = async (job) => {
+  const markServiced = async (job) => {
     const now = new Date();
     const { data: updated } = await supabase.from('jobs').update({
-      status: 'paid',
+      status: 'serviced',
       completed_date: now.toISOString().split('T')[0],
       scheduled_time: job.scheduled_time || now.toTimeString().slice(0,5),
     }).eq('id', job.id).select().single();
+    setJobs(js => js.map(j => j.id === job.id ? updated : j));
+    setSelected(null);
+  };
+
+  const markComplete = async (job) => {
+    const { data: updated } = await supabase.from('jobs').update({ status: 'complete' }).eq('id', job.id).select().single();
     setJobs(js => js.map(j => j.id === job.id ? updated : j));
     setSelected(null);
   };
@@ -768,9 +775,21 @@ function ScheduleView({ jobs, setJobs, currentUser, allUsers }) {
               </div>
             </div>
             {selected.status === 'scheduled' && currentUser.role === 'tech' && (
-              <button style={{ ...s.btnGreen, width: '100%', padding: 11, fontSize: 13, marginTop: 16 }} onClick={() => markComplete(selected)}>✅ Mark Complete & Charge Customer</button>
+              <button style={{ ...s.btnGreen, width: '100%', padding: 11, fontSize: 13, marginTop: 16 }} onClick={() => markServiced(selected)}>✅ Mark as Serviced</button>
             )}
-            {selected.status === 'paid' && <div style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 8, padding: 12, textAlign: 'center', fontSize: 13, color: '#10b981', marginTop: 16 }}>✅ Job complete · Customer charged ${selected.price}</div>}
+            {selected.status === 'serviced' && (
+              <div style={{ marginTop: 16 }}>
+                <div style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 8, padding: 10, textAlign: 'center', fontSize: 12, color: '#10b981', marginBottom: 8 }}>
+                  ✅ Serviced · Pending payment collection
+                </div>
+                {currentUser.role === 'admin' && (
+                  <button style={{ ...s.btnPrimary, marginTop: 0, background: '#f59e0b' }} onClick={() => markComplete(selected)}>⭐ Mark Complete — Payment Collected</button>
+                )}
+              </div>
+            )}
+            {(selected.status === 'complete' || selected.status === 'paid') && (
+              <div style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 8, padding: 12, textAlign: 'center', fontSize: 13, color: '#f59e0b', marginTop: 16, fontWeight: 700 }}>⭐ Complete ⭐ · ${selected.price} collected</div>
+            )}
           </div>
         </div>
       )}
@@ -782,8 +801,10 @@ function ScheduleView({ jobs, setJobs, currentUser, allUsers }) {
 function AdminDashboard({ pins, jobs, allUsers }) {
   const reps = allUsers.filter(u => u.role === 'rep');
   const techs = allUsers.filter(u => u.role === 'tech');
-  const revenue = jobs.filter(j => j.status === 'paid').reduce((s, j) => s + (j.price || 0), 0);
+  const pendingRevenue = jobs.filter(j => j.status === 'serviced').reduce((s, j) => s + (j.price || 0), 0);
+  const revenue = jobs.filter(j => ['complete','paid'].includes(j.status)).reduce((s, j) => s + (j.price || 0), 0);
   const scheduled = jobs.filter(j => j.status === 'scheduled').length;
+  const serviced = jobs.filter(j => j.status === 'serviced').length;
   const conv = pins.length ? Math.round(pins.filter(p => ['closed','paid','appointment'].includes(p.status)).length / pins.length * 100) : 0;
   const repStats = reps.map(r => ({ ...r, knocked: pins.filter(p => p.rep_id === r.id).length, closed: pins.filter(p => p.rep_id === r.id && ['closed','paid'].includes(p.status)).length, rev: jobs.filter(j => j.rep_id === r.id && j.status === 'paid').reduce((s, j) => s + (j.price || 0), 0) }));
 
@@ -791,9 +812,15 @@ function AdminDashboard({ pins, jobs, allUsers }) {
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <div style={s.topbar}><div style={s.topbarTitle}>📊 Admin Dashboard</div></div>
       <div style={s.page}>
-        <div style={s.statsGrid}>
-          {[{ l: 'Total Revenue', v: `$${revenue}`, c: '#10b981' }, { l: 'Scheduled Jobs', v: scheduled, c: '#4f8ef7' }, { l: 'Doors Knocked', v: pins.length, c: '#f59e0b' }, { l: 'Conversion Rate', v: `${conv}%`, c: '#f0f0f8' }].map((st, i) => (
-            <div key={i} style={s.card()}><div style={{ fontSize: 11, color: '#8888aa', marginBottom: 4 }}>{st.l}</div><div style={{ fontWeight: 800, fontSize: 26, color: st.c }}>{st.v}</div></div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 12, marginBottom: 20 }}>
+          {[
+            { l: '⭐ Complete ⭐', v: `$${revenue}`, c: '#f59e0b' },
+            { l: 'Pending Revenue', v: `$${pendingRevenue}`, c: '#10b981' },
+            { l: 'Scheduled', v: scheduled, c: '#4f8ef7' },
+            { l: 'Serviced', v: serviced, c: '#10b981' },
+            { l: 'Conversion Rate', v: `${conv}%`, c: '#f0f0f8' },
+          ].map((st, i) => (
+            <div key={i} style={s.card()}><div style={{ fontSize: 11, color: '#8888aa', marginBottom: 4 }}>{st.l}</div><div style={{ fontWeight: 800, fontSize: 24, color: st.c }}>{st.v}</div></div>
           ))}
         </div>
         <div style={s.twoCol}>
@@ -848,7 +875,7 @@ function AdminDashboard({ pins, jobs, allUsers }) {
 function RepDashboard({ pins, jobs, currentUser }) {
   const my = pins.filter(p => p.rep_id === currentUser.id);
   const knocked = my.length, appts = my.filter(p => p.status === 'appointment').length, closed = my.filter(p => ['closed','paid'].includes(p.status)).length;
-  const rev = jobs.filter(j => j.rep_id === currentUser.id && j.status === 'paid').reduce((s, j) => s + (j.price || 0), 0);
+  const rev = jobs.filter(j => j.rep_id === currentUser.id && ['complete','paid'].includes(j.status)).reduce((s, j) => s + (j.price || 0), 0);
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <div style={s.topbar}><div style={s.topbarTitle}>📈 My Stats</div></div>
@@ -882,10 +909,14 @@ function RepDashboard({ pins, jobs, currentUser }) {
 function TechDashboard({ jobs, setJobs, currentUser }) {
   const my = jobs.filter(j => j.tech_id === currentUser.id);
   const pending = my.filter(j => j.status === 'scheduled');
-  const done = my.filter(j => ['paid','complete'].includes(j.status));
+  const done = my.filter(j => ['serviced','complete','paid'].includes(j.status));
 
-  const complete = async (job) => {
-    const { data: updated } = await supabase.from('jobs').update({ status: 'paid', completed_date: new Date().toISOString().split('T')[0] }).eq('id', job.id).select().single();
+  const markServiced = async (job) => {
+    const now = new Date();
+    const { data: updated } = await supabase.from('jobs').update({
+      status: 'serviced',
+      completed_date: now.toISOString().split('T')[0],
+    }).eq('id', job.id).select().single();
     setJobs(js => js.map(j => j.id === job.id ? updated : j));
   };
 
@@ -904,7 +935,7 @@ function TechDashboard({ jobs, setJobs, currentUser }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}><div style={{ fontWeight: 700 }}>{j.customer_name}</div><Badge status={j.status} /></div>
             <div style={{ fontSize: 12, color: '#8888aa', marginBottom: 2 }}>📍 {j.address}</div>
             <div style={{ fontSize: 12, color: '#8888aa', marginBottom: 12 }}>📅 {j.scheduled_date || '—'} {j.scheduled_time && `· ${j.scheduled_time}`} · <span style={{ textTransform: 'capitalize' }}>{j.service}</span> · ${j.price}</div>
-            <button style={{ ...s.btnGreen, width: '100%', padding: 10 }} onClick={() => complete(j)}>✅ Mark Complete & Charge Customer</button>
+            <button style={{ ...s.btnGreen, width: '100%', padding: 10 }} onClick={() => markServiced(j)}>✅ Mark as Serviced</button>
           </div>
         ))}
         {done.length > 0 && <>
