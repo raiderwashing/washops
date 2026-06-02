@@ -1298,6 +1298,13 @@ function TeamView({ allUsers, setAllUsers }) {
     setAllUsers(us => us.map(u => u.id === user.id ? updated : u));
   };
 
+  const deleteUser = async (user) => {
+    if (!window.confirm(`Are you sure you want to permanently delete ${user.name}? This cannot be undone.`)) return;
+    // Remove from users table
+    await supabase.from('users').delete().eq('id', user.id);
+    setAllUsers(us => us.filter(u => u.id !== user.id));
+  };
+
   const roleColor = { admin: '#4f8ef7', rep: '#10b981', tech: '#f59e0b' };
 
   return (
@@ -1367,6 +1374,11 @@ function TeamView({ allUsers, setAllUsers }) {
                       {user.role !== 'admin' && (
                         <button onClick={() => toggleActive(user)} style={{ padding: '5px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: 'none', background: user.active !== false ? 'rgba(239,68,68,0.15)' : 'rgba(16,185,129,0.15)', color: user.active !== false ? '#ef4444' : '#10b981' }}>
                           {user.active !== false ? 'Deactivate' : 'Reactivate'}
+                        </button>
+                      )}
+                      {user.role !== 'admin' && (
+                        <button onClick={() => deleteUser(user)} style={{ padding: '5px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: '1px solid #ef4444', background: 'transparent', color: '#ef4444' }}>
+                          🗑 Delete
                         </button>
                       )}
                     </div>
