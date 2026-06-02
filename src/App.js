@@ -764,7 +764,7 @@ function ScheduleView({ jobs, setJobs, currentUser, allUsers }) {
   const [view, setView] = useState('month'); // month | week | day
   const [currentDate, setCurrentDate] = useState(new Date());
   const today = new Date();
-  const visible = currentUser.role === 'admin' ? jobs : currentUser.role === 'rep' ? jobs.filter(j => j.rep_id === currentUser.id) : jobs.filter(j => j.tech_id === currentUser.id);
+  const visible = currentUser.role === 'admin' ? jobs : currentUser.role === 'rep' ? jobs.filter(j => String(j.rep_id) === String(currentUser.id)) : jobs.filter(j => String(j.tech_id) === String(currentUser.id));
   const techs = allUsers.filter(u => u.role === 'tech');
 
   const markServiced = async (job) => {
@@ -1035,7 +1035,7 @@ function AdminDashboard({ pins, jobs, allUsers, onRefresh }) {
   const serviced = jobs.filter(j => j.status === 'serviced').length;
   const conv = pins.length ? Math.round(pins.filter(p => ['closed','paid','appointment'].includes(p.status)).length / pins.length * 100) : 0;
   const knockers = [...reps, ...allUsers.filter(u => u.role === 'admin')];
-  const repStats = knockers.map(r => ({ ...r, knocked: pins.filter(p => String(p.rep_id) === String(r.id)).length, closed: pins.filter(p => String(p.rep_id) === String(r.id) && ['closed','paid'].includes(p.status)).length, rev: jobs.filter(j => String(j.rep_id) === String(r.id) && ['complete','paid'].includes(j.status)).reduce((s, j) => s + (j.price || 0), 0) }));
+  const repStats = knockers.map(r => ({ ...r, knocked: pins.filter(p => String(p.rep_id) === String(r.id)).length, closed: pins.filter(p => String(p.rep_id) === String(r.id) && ['closed','paid'].includes(p.status)).length, rev: jobs.filter(j => String(j.rep_id) === String(r.id) && ['complete','paid','serviced'].includes(j.status)).reduce((s, j) => s + (j.price || 0), 0) }));
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -1078,7 +1078,7 @@ function AdminDashboard({ pins, jobs, allUsers, onRefresh }) {
           <div style={s.card()}>
             <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 16 }}>Technician Status</div>
             {techs.map(t => {
-              const tj = jobs.filter(j => j.tech_id === t.id);
+              const tj = jobs.filter(j => String(j.tech_id) === String(t.id));
               return (
                 <div key={t.id} style={{ marginBottom: 14, padding: 12, background: '#1a1a24', borderRadius: 8 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}><Avatar name={t.name} role="tech" size={28} /><div><div style={{ fontSize: 13, fontWeight: 500 }}>{t.name}</div><div style={{ fontSize: 11, color: '#8888aa' }}>Technician</div></div></div>
@@ -1142,6 +1142,7 @@ function TechDashboard({ jobs, setJobs, currentUser }) {
   const my = jobs.filter(j => String(j.tech_id) === String(currentUser.id));
   const pending = my.filter(j => j.status === 'scheduled');
   const done = my.filter(j => ['serviced','complete','paid'].includes(j.status));
+  console.log('Tech jobs:', my.length, 'pending:', pending.length, 'done:', done.length, 'currentUser:', currentUser.id);
 
   const markServiced = async (job) => {
     const now = new Date();
