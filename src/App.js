@@ -1153,11 +1153,29 @@ function RevenueChart({ jobs }) {
                 </g>
               ))}
 
-              {/* Pending area (collected + pending stacked) */}
-              <polyline points={pts_pending} fill="none" stroke="#f59e0b" strokeWidth="1.5" strokeOpacity="0.7" strokeDasharray="3 2" />
+              {/* Build area paths */}
+              {(() => {
+                const toPath = (pts, close = false) => {
+                  const arr = pts.split(' ');
+                  let d = `M ${arr[0]}`;
+                  for (let i = 1; i < arr.length; i++) d += ` L ${arr[i]}`;
+                  if (close) d += ` L ${chartW},${chartH} L 0,${chartH} Z`;
+                  return d;
+                };
+                return (
+                  <>
+                    {/* Pending area fill */}
+                    <path d={toPath(pts_pending, true)} fill="#f59e0b" fillOpacity="0.12" />
+                    {/* Pending solid line */}
+                    <path d={toPath(pts_pending)} fill="none" stroke="#f59e0b" strokeWidth="2" />
 
-              {/* Collected line */}
-              <polyline points={pts_collected} fill="none" stroke="#10b981" strokeWidth="2" />
+                    {/* Collected area fill */}
+                    <path d={toPath(pts_collected, true)} fill="#10b981" fillOpacity="0.15" />
+                    {/* Collected solid line */}
+                    <path d={toPath(pts_collected)} fill="none" stroke="#10b981" strokeWidth="2.5" />
+                  </>
+                );
+              })()}
 
               {/* Dots + hover */}
               {data.map((d, i) => {
