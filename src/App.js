@@ -1624,6 +1624,217 @@ function TeamView({ allUsers, setAllUsers }) {
   );
 }
 
+// ─── Payroll View ────────────────────────────────────────────────────────────
+function PayrollView({ jobs, allUsers, setAllUsers }) {
+  const [editingRate, setEditingRate] = useState(null);
+  const [rateForm, setRateForm] = useState({ rep_rate: '', tech_rate: '' });
+  const [saving, setSaving] = useState(false);
+
+  const workers = allUsers.filter(u => ['rep', 'tech', 'admin'].includes(u.role));
+
+  // Get all complete jobs for a user (as rep or tech)
+  const getEarnings = (user) => {
+    const completeJobs = jobs.filter(j => ['complete', 'paid'].includes(j.status));
+    
+    const repJobs = completeJobs.filter(j => String(j.rep_id) === String(user.id));
+    const techJobs = completeJobs.filter(j => String(j.tech_id) === String(user.id));
+    
+    const repRate = (user.rep_rate || 0) / 100;
+    const techRate = (user.tech_rate || 0) / 100;
+    
+    const repEarnings = repJobs.reduce((s, j) => s + (j.price || 0) * repRate, 0);
+    const techEarnings = techJobs.reduce((s, j) => s + (j.price || 0) * techRate, 0);
+    
+    return {
+      repJobs: repJobs.length,
+      techJobs: techJobs.length,
+      repEarnings,
+      techEarnings,
+      total: repEarnings + techEarnings,
+      repRate: user.rep_rate || 0,
+      techRate: user.tech_rate || 0,
+    };
+  };
+
+  const openEdit = (user) => {
+    setEditingRate(user);
+    setRateForm({ rep_rate: user.rep_rate || '', tech_rate: user.tech_rate || '' });
+  };
+
+  const saveRate = async () => {
+    setSaving(true);
+    const { data: updated } = await supabase.from('users').update({
+      rep_rate: Number(rateForm.rep_rate) || 0,
+      tech_rate: Number(rateForm.tech_rate) || 0,
+    }).eq('id', editingRate.id).select().single();
+    setAllUsers(us => us.map(u => u.id === editingRate.id ? updated : u));
+    setSaving(false);
+    setEditingRate(null);
+  };
+
+  const totalPayroll = workers.reduce((s, u) => s + getEarnings(u).total, 0);
+  const completeJobs = jobs.filter(j => ['complete','paid'].includes(j.status));
+  const totalRevenue = completeJobs.reduce((s, j) => s + (j.price || 0), 0);
+
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={s.topbar}>
+        <div style={s.topbarTitle}>💰 Payroll</div>
+      </div>
+      <div style={s.page}>
+
+        {/* Summary stats */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 24 }}>
+          <div style={s.card()}>
+            <div style={{ fontSize: 11, color: '#8888aa', marginBottom: 4 }}>Total Revenue Collected</div>
+            <div style={{ fontWeight: 800, fontSize: 26, color: '#f59e0b' }}>${totalRevenue.toFixed(2)}</div>
+          </div>
+          <div style={s.card()}>
+            <div style={{ fontSize: 11, color: '#8888aa', marginBottom: 4 }}>Total Payroll Owed</div>
+            <div style={{ fontWeight: 800, fontSize: 26, color: '#ef4444' }}>${totalPayroll.toFixed(2)}</div>
+          </div>
+          <div style={s.card()}>
+            <div style={{ fontSize: 11, color: '#8888aa', marginBottom: 4 }}>Net After Payroll</div>
+            <div style={{ fontWeight: 800, fontSize: 26, color: '#10b981' }}>${(totalRevenue - totalPayroll).toFixed(2)}</div>
+          </div>
+        </div>
+
+        {/* Per person breakdown */}
+        <div style={{ background: '#111118', border: '1px solid #2a2a3a', borderRadius: 12, overflow: 'hidden', marginBottom: 24 }}>
+          <div style={{ padding: '14px 16px', borderBottom: '1px solid #2a2a3a', fontWeight: 700, fontSize: 14 }}>Team Earnings</div>
+          <table style={s.table}>
+            <thead>
+              <tr>
+                <th style={s.th}>Name</th>
+                <th style={s.th}>Role</th>
+                <th style={s.th}>Rep Rate</th>
+                <th style={s.th}>Tech Rate</th>
+                <th style={s.th}>Rep Jobs</th>
+                <th style={s.th}>Tech Jobs</th>
+                <th style={s.th}>Rep Earned</th>
+                <th style={s.th}>Tech Earned</th>
+                <th style={s.th}>Total Owed</th>
+                <th style={s.th}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {workers.map(user => {
+                const e = getEarnings(user);
+                return (
+                  <tr key={user.id}>
+                    <td style={s.td}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Avatar name={user.name} role={user.role} size={26} />
+                        <span style={{ fontWeight: 600 }}>{user.name}</span>
+                      </div>
+                    </td>
+                    <td style={s.td}>
+                      <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: user.role === 'rep' ? 'rgba(16,185,129,0.15)' : user.role === 'tech' ? 'rgba(245,158,11,0.15)' : 'rgba(79,142,247,0.15)', color: user.role === 'rep' ? '#10b981' : user.role === 'tech' ? '#f59e0b' : '#4f8ef7', fontWeight: 600, textTransform: 'capitalize' }}>{user.role}</span>
+                    </td>
+                    <td style={s.td}>
+                      <span style={{ color: '#10b981', fontWeight: 600 }}>{e.repRate}%</span>
+                    </td>
+                    <td style={s.td}>
+                      <span style={{ color: '#f59e0b', fontWeight: 600 }}>{e.techRate}%</span>
+                    </td>
+                    <td style={{ ...s.td, color: '#8888aa' }}>{e.repJobs}</td>
+                    <td style={{ ...s.td, color: '#8888aa' }}>{e.techJobs}</td>
+                    <td style={s.td}><span style={{ color: '#10b981', fontWeight: 600 }}>${e.repEarnings.toFixed(2)}</span></td>
+                    <td style={s.td}><span style={{ color: '#f59e0b', fontWeight: 600 }}>${e.techEarnings.toFixed(2)}</span></td>
+                    <td style={s.td}>
+                      <span style={{ fontWeight: 800, fontSize: 15, color: e.total > 0 ? '#ef4444' : '#555570' }}>${e.total.toFixed(2)}</span>
+                    </td>
+                    <td style={s.td}>
+                      <button style={{ ...s.btnGhost, fontSize: 11, padding: '5px 10px' }} onClick={() => openEdit(user)}>
+                        ✏️ Set Rate
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Job breakdown per person */}
+        {workers.map(user => {
+          const userJobs = jobs.filter(j => ['complete','paid'].includes(j.status) && (String(j.rep_id) === String(user.id) || String(j.tech_id) === String(user.id)));
+          if (userJobs.length === 0) return null;
+          const e = getEarnings(user);
+          return (
+            <div key={user.id} style={{ ...s.card({ marginBottom: 16 }) }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <Avatar name={user.name} role={user.role} size={30} />
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 14 }}>{user.name}</div>
+                    <div style={{ fontSize: 11, color: '#8888aa' }}>{userJobs.length} completed jobs · ${e.total.toFixed(2)} owed</div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 16 }}>
+                  {e.repRate > 0 && <div style={{ textAlign: 'right' }}><div style={{ fontSize: 10, color: '#8888aa' }}>Rep Rate</div><div style={{ fontSize: 13, color: '#10b981', fontWeight: 700 }}>{e.repRate}%</div></div>}
+                  {e.techRate > 0 && <div style={{ textAlign: 'right' }}><div style={{ fontSize: 10, color: '#8888aa' }}>Tech Rate</div><div style={{ fontSize: 13, color: '#f59e0b', fontWeight: 700 }}>{e.techRate}%</div></div>}
+                </div>
+              </div>
+              <table style={s.table}>
+                <thead><tr><th style={s.th}>Customer</th><th style={s.th}>Service</th><th style={s.th}>Job Price</th><th style={s.th}>Role</th><th style={s.th}>Cut</th><th style={s.th}>Earned</th></tr></thead>
+                <tbody>
+                  {userJobs.map(j => {
+                    const isRep = String(j.rep_id) === String(user.id);
+                    const isTech = String(j.tech_id) === String(user.id);
+                    const rate = isRep ? e.repRate : e.techRate;
+                    const earned = (j.price || 0) * rate / 100;
+                    return (
+                      <tr key={j.id}>
+                        <td style={s.td}>{j.customer_name}</td>
+                        <td style={{ ...s.td, textTransform: 'capitalize', fontSize: 12 }}>{j.service}</td>
+                        <td style={{ ...s.td, fontWeight: 600 }}>${j.price}</td>
+                        <td style={s.td}><span style={{ fontSize: 11, color: isRep ? '#10b981' : '#f59e0b' }}>{isRep && isTech ? 'Rep + Tech' : isRep ? 'Rep' : 'Tech'}</span></td>
+                        <td style={{ ...s.td, color: '#8888aa' }}>{rate}%</td>
+                        <td style={{ ...s.td, fontWeight: 700, color: '#f0f0f8' }}>${earned.toFixed(2)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Edit rate modal */}
+      {editingRate && (
+        <div style={s.backdrop} onClick={e => e.target === e.currentTarget && setEditingRate(null)}>
+          <div style={{ ...s.modal, width: 360 }}>
+            <div style={{ fontWeight: 700, fontSize: 17, marginBottom: 6 }}>Set Pay Rate</div>
+            <div style={{ fontSize: 13, color: '#8888aa', marginBottom: 20 }}>{editingRate.name}</div>
+            <div style={s.twoCol}>
+              <div>
+                <label style={s.label}>Rep Rate (%)</label>
+                <input style={s.input} type="number" min="0" max="100" value={rateForm.rep_rate} onChange={e => setRateForm(f => ({ ...f, rep_rate: e.target.value }))} placeholder="e.g. 20" />
+                <div style={{ fontSize: 11, color: '#8888aa', marginTop: 4 }}>% of jobs they sold</div>
+              </div>
+              <div>
+                <label style={s.label}>Tech Rate (%)</label>
+                <input style={s.input} type="number" min="0" max="100" value={rateForm.tech_rate} onChange={e => setRateForm(f => ({ ...f, tech_rate: e.target.value }))} placeholder="e.g. 10" />
+                <div style={{ fontSize: 11, color: '#8888aa', marginTop: 4 }}>% of jobs they serviced</div>
+              </div>
+            </div>
+            <div style={{ background: '#1a1a24', borderRadius: 8, padding: 12, fontSize: 12, color: '#8888aa', marginBottom: 16, lineHeight: 1.7 }}>
+              Example: Rep rate 20% on a $150 job = <strong style={{ color: '#10b981' }}>$30 owed</strong><br/>
+              Tech rate 10% on a $150 job = <strong style={{ color: '#f59e0b' }}>$15 owed</strong>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button style={{ ...s.btnGhost, flex: 1 }} onClick={() => setEditingRate(null)}>Cancel</button>
+              <button style={{ ...s.btnAccent, flex: 2, padding: 10 }} onClick={saveRate} disabled={saving}>{saving ? 'Saving...' : 'Save Rate'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main App ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [user, setUser] = useState(null);
@@ -1691,7 +1902,7 @@ export default function App() {
   if (!user) return <AuthScreen onLogin={u => { setUser(u); setPage(u.role === 'tech' ? 'jobs' : u.role === 'admin' ? 'dashboard' : 'map'); }} />;
 
   const NAV = {
-    admin: [{ id: 'dashboard', icon: '📊', label: 'Dashboard' }, { id: 'map', icon: '🗺', label: 'Field Map' }, { id: 'schedule', icon: '📅', label: 'Schedule' }, { id: 'customers', icon: '👥', label: 'Customers' }, { id: 'team', icon: '🧑‍💼', label: 'Team' }],
+    admin: [{ id: 'dashboard', icon: '📊', label: 'Dashboard' }, { id: 'map', icon: '🗺', label: 'Field Map' }, { id: 'schedule', icon: '📅', label: 'Schedule' }, { id: 'customers', icon: '👥', label: 'Customers' }, { id: 'team', icon: '🧑‍💼', label: 'Team' }, { id: 'payroll', icon: '💰', label: 'Payroll' }],
     rep: [{ id: 'map', icon: '🗺', label: 'Field Map' }, { id: 'schedule', icon: '📅', label: 'Schedule' }, { id: 'dashboard', icon: '📈', label: 'My Stats' }, { id: 'customers', icon: '👥', label: 'Customers' }],
     tech: [{ id: 'jobs', icon: '🔧', label: 'My Jobs' }, { id: 'schedule', icon: '📅', label: 'Schedule' }],
   };
@@ -1714,6 +1925,7 @@ export default function App() {
     if (page === 'jobs') return <TechDashboard jobs={jobs} setJobs={setJobs} currentUser={user} />;
     if (page === 'customers') return <CustomersView pins={pins} jobs={jobs} />;
     if (page === 'team') return <TeamView allUsers={allUsers} setAllUsers={setAllUsers} />;
+    if (page === 'payroll') return <PayrollView jobs={jobs} allUsers={allUsers} setAllUsers={setAllUsers} />;
     return null;
   };
 
