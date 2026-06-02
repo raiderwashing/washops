@@ -1025,7 +1025,7 @@ function ScheduleView({ jobs, setJobs, currentUser, allUsers }) {
 }
 
 // ─── Admin Dashboard ──────────────────────────────────────────────────────────
-function AdminDashboard({ pins, jobs, allUsers }) {
+function AdminDashboard({ pins, jobs, allUsers, onRefresh }) {
   const reps = allUsers.filter(u => u.role === 'rep');
   const techs = allUsers.filter(u => u.role === 'tech');
   const pendingRevenue = jobs.filter(j => j.status === 'serviced').reduce((s, j) => s + (j.price || 0), 0);
@@ -1038,7 +1038,10 @@ function AdminDashboard({ pins, jobs, allUsers }) {
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      <div style={s.topbar}><div style={s.topbarTitle}>📊 Admin Dashboard</div></div>
+      <div style={s.topbar}>
+        <div style={s.topbarTitle}>📊 Admin Dashboard</div>
+        <button style={s.btnGhost} onClick={onRefresh}>🔄 Refresh</button>
+      </div>
       <div style={s.page}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 12, marginBottom: 20 }}>
           {[
@@ -1101,7 +1104,7 @@ function AdminDashboard({ pins, jobs, allUsers }) {
 
 // ─── Rep Dashboard ────────────────────────────────────────────────────────────
 function RepDashboard({ pins, jobs, currentUser }) {
-  const my = pins.filter(p => p.rep_id === currentUser.id || (currentUser.role === 'admin' && p.rep_id === currentUser.id));
+  const my = pins.filter(p => String(p.rep_id) === String(currentUser.id));
   const knocked = my.length, appts = my.filter(p => p.status === 'appointment').length, closed = my.filter(p => ['closed','paid'].includes(p.status)).length;
   const rev = jobs.filter(j => j.rep_id === currentUser.id && ['complete','paid'].includes(j.status)).reduce((s, j) => s + (j.price || 0), 0);
   return (
@@ -1468,7 +1471,16 @@ export default function App() {
   const renderPage = () => {
     if (page === 'map') return <MapView pins={pins} setPins={setPins} currentUser={user} allUsers={allUsers} jobs={jobs} setJobs={setJobs} zones={zones} setZones={setZones} />;
     if (page === 'schedule') return <ScheduleView jobs={jobs} setJobs={setJobs} currentUser={user} allUsers={allUsers} />;
-    if (page === 'dashboard') return user.role === 'admin' ? <AdminDashboard pins={pins} jobs={jobs} allUsers={allUsers} /> : <RepDashboard pins={pins} jobs={jobs} currentUser={user} />;
+    if (page === 'dashboard') return user.role === 'admin' ? <AdminDashboard pins={pins} jobs={jobs} allUsers={allUsers} onRefresh={async () => {
+      const [{ data: pinsData }, { data: jobsData }, { data: usersData }] = await Promise.all([
+        supabase.from('pins').select('*').order('created_at', { ascending: false }),
+        supabase.from('jobs').select('*').order('created_at', { ascending: false }),
+        supabase.from('users').select('*'),
+      ]);
+      setPins(pinsData || []);
+      setJobs(jobsData || []);
+      setAllUsers(usersData || []);
+    }} /> : <RepDashboard pins={pins} jobs={jobs} currentUser={user} />;
     if (page === 'jobs') return <TechDashboard jobs={jobs} setJobs={setJobs} currentUser={user} />;
     if (page === 'customers') return <CustomersView pins={pins} jobs={jobs} />;
     if (page === 'team') return <TeamView allUsers={allUsers} setAllUsers={setAllUsers} />;
