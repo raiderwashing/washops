@@ -1243,23 +1243,36 @@ function TeamView({ allUsers, setAllUsers }) {
   const handleSave = async () => {
     setSaving(true);
     if (editUser) {
-      // Update existing user
-      const { data: updated } = await supabase.from('users').update({
-        name: form.name,
-        phone: form.phone,
-        role: form.role,
-        temp_password: form.password,
-        active: form.active,
-      }).eq('id', editUser.id).select().single();
+      // Update existing user in users table
+      const updates = { name: form.name, phone: form.phone, role: form.role, active: form.active };
+      if (form.password) updates.temp_password = form.password;
+      if (form.email !== editUser.email) updates.email = form.email;
+      const { data: updated } = await supabase.from('users').update(updates).eq('id', editUser.id).select().single();
       setAllUsers(us => us.map(u => u.id === editUser.id ? updated : u));
     } else {
-      // Create auth user + users table entry
-      const { data: authData, error } = await supabase.auth.admin
-        ? await supabase.auth.signUp({ email: form.email, password: form.password })
-        : await supabase.auth.signUp({ email: form.email, password: form.password });
-      
-      // Insert into users table regardless
-      const { data: newUser } = await supabase.from('users').insert({
+      // Step 1: Create Supabase auth account
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: form.email,
+        password: form.password,
+        options: { emailRedirectTo: null }
+      });
+
+      if (authError) {
+        alert(`Error creating account: ${authError.message}`);
+        setSaving(false);
+        return;
+      }
+
+      const authId = authData?.user?.id;
+      if (!authId) {
+        alert('Could not create auth account. Check the email and try again.');
+        setSaving(false);
+        return;
+      }
+
+      // Step 2: Insert into users table using the auth ID
+      const { data: newUser, error: dbError } = await supabase.from('users').insert({
+        id: authId,
         name: form.name,
         email: form.email,
         phone: form.phone,
@@ -1267,6 +1280,13 @@ function TeamView({ allUsers, setAllUsers }) {
         temp_password: form.password,
         active: true,
       }).select().single();
+
+      if (dbError) {
+        alert(`Account created but profile save failed: ${dbError.message}`);
+        setSaving(false);
+        return;
+      }
+
       if (newUser) setAllUsers(us => [newUser, ...us]);
     }
     setSaving(false);
@@ -1393,8 +1413,8 @@ function TeamView({ allUsers, setAllUsers }) {
               </div>
             </div>
             {!editUser && (
-              <div style={{ background: '#1a1a24', borderRadius: 8, padding: 12, fontSize: 12, color: '#8888aa', marginBottom: 14, lineHeight: 1.6 }}>
-                ⚠️ After adding, go to <strong style={{ color: '#f0f0f8' }}>Supabase → Auth → Users</strong> and manually create their login with the same email and temp password.
+              <div style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 8, padding: 12, fontSize: 12, color: '#10b981', marginBottom: 14, lineHeight: 1.6 }}>
+                ✅ Account will be created automatically. Tell them their email and temp password to log in.
               </div>
             )}
             <div style={{ display: 'flex', gap: 8 }}>
