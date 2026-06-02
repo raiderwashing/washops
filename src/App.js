@@ -49,6 +49,17 @@ const STATUS_CONFIG = {
 
 const PIN_COLORS = { 'not-interested': '#ef4444', 'not-home': '#e879f9', 'follow-up': '#f59e0b', appointment: '#10b981', closed: '#4f8ef7', paid: '#7c3aed' };
 
+// Mobile styles injected into head
+if (!document.getElementById('washops-mobile-styles')) {
+  const style = document.createElement('style');
+  style.id = 'washops-mobile-styles';
+  style.textContent = `
+    * { -webkit-tap-highlight-color: transparent; }
+    input, select, textarea { font-size: 16px !important; }
+  `;
+  document.head.appendChild(style);
+}
+
 // Mobile detection hook
 function useIsMobile() {
   const [isMobile, setIsMobile] = React.useState(window.innerWidth <= 768);
@@ -58,37 +69,6 @@ function useIsMobile() {
     return () => window.removeEventListener('resize', handler);
   }, []);
   return isMobile;
-}
-
-// Mobile styles injected into head
-if (!document.getElementById('washops-mobile-styles')) {
-  const style = document.createElement('style');
-  style.id = 'washops-mobile-styles';
-  style.textContent = `
-    * { -webkit-tap-highlight-color: transparent; }
-    input, select, textarea { font-size: 16px !important; }
-    .mobile-modal {
-      position: fixed !important;
-      inset: 0 !important;
-      width: 100% !important;
-      max-width: 100% !important;
-      max-height: 100% !important;
-      border-radius: 0 !important;
-      margin: 0 !important;
-    }
-    .mobile-modal-sheet {
-      position: fixed !important;
-      bottom: 0 !important;
-      left: 0 !important;
-      right: 0 !important;
-      width: 100% !important;
-      max-width: 100% !important;
-      max-height: 90vh !important;
-      border-radius: 16px 16px 0 0 !important;
-      overflow-y: auto !important;
-    }
-  `;
-  document.head.appendChild(style);
 }
 
 const AGREEMENT_ONETIME = `ONE-TIME WINDOW CLEANING SERVICE AGREEMENT — RAIDER WASHING
@@ -1074,6 +1054,7 @@ function ScheduleView({ jobs, setJobs, currentUser, allUsers }) {
 function RevenueChart({ jobs }) {
   const [view, setView] = useState('month');
   const [expanded, setExpanded] = useState(true);
+  const [hovered, setHovered] = useState(null);
   const now = new Date();
 
   const buildData = () => {
@@ -1153,7 +1134,7 @@ function RevenueChart({ jobs }) {
   const chartW = 100;
   const pts_collected = data.map((d, i) => `${(i / (data.length - 1)) * chartW},${chartH - (d.collected / maxVal) * chartH}`).join(' ');
   const pts_pending = data.map((d, i) => `${(i / (data.length - 1)) * chartW},${chartH - ((d.collected + d.pending) / maxVal) * chartH}`).join(' ');
-  const [hovered, setHovered] = useState(null);
+
 
   return (
     <div style={{ ...s.card({ marginBottom: 20 }) }}>
