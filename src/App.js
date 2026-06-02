@@ -1026,6 +1026,169 @@ function ScheduleView({ jobs, setJobs, currentUser, allUsers }) {
 }
 
 // ─── Admin Dashboard ──────────────────────────────────────────────────────────
+// ─── Revenue Chart ───────────────────────────────────────────────────────────
+function RevenueChart({ jobs }) {
+  const [view, setView] = useState('month');
+  const [expanded, setExpanded] = useState(true);
+  const now = new Date();
+
+  const buildData = () => {
+    if (view === 'day') {
+      // Last 24 hours by hour
+      return Array.from({ length: 24 }, (_, i) => {
+        const hour = new Date(now);
+        hour.setHours(now.getHours() - 23 + i, 0, 0, 0);
+        const label = hour.toLocaleTimeString('default', { hour: 'numeric', hour12: true });
+        const collected = jobs.filter(j => {
+          if (!j.completed_date) return false;
+          const d = new Date(j.completed_date);
+          return d.getHours() === hour.getHours() && d.toDateString() === hour.toDateString() && ['complete','paid'].includes(j.status);
+        }).reduce((s, j) => s + (j.price || 0), 0);
+        const pending = jobs.filter(j => {
+          if (!j.completed_date) return false;
+          const d = new Date(j.completed_date);
+          return d.getHours() === hour.getHours() && d.toDateString() === hour.toDateString() && j.status === 'serviced';
+        }).reduce((s, j) => s + (j.price || 0), 0);
+        return { label, collected, pending };
+      });
+    }
+    if (view === 'week') {
+      // Last 7 days
+      return Array.from({ length: 7 }, (_, i) => {
+        const day = new Date(now);
+        day.setDate(now.getDate() - 6 + i);
+        const label = day.toLocaleDateString('default', { weekday: 'short', month: 'numeric', day: 'numeric' });
+        const dateStr = day.toISOString().split('T')[0];
+        const collected = jobs.filter(j => j.completed_date === dateStr && ['complete','paid'].includes(j.status)).reduce((s, j) => s + (j.price || 0), 0);
+        const pending = jobs.filter(j => j.completed_date === dateStr && j.status === 'serviced').reduce((s, j) => s + (j.price || 0), 0);
+        return { label, collected, pending };
+      });
+    }
+    if (view === 'month') {
+      // Last 6 months
+      return Array.from({ length: 6 }, (_, i) => {
+        const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1);
+        const label = d.toLocaleDateString('default', { month: 'short', year: '2-digit' });
+        const collected = jobs.filter(j => {
+          if (!j.completed_date) return false;
+          const jd = new Date(j.completed_date);
+          return jd.getMonth() === d.getMonth() && jd.getFullYear() === d.getFullYear() && ['complete','paid'].includes(j.status);
+        }).reduce((s, j) => s + (j.price || 0), 0);
+        const pending = jobs.filter(j => {
+          if (!j.completed_date) return false;
+          const jd = new Date(j.completed_date);
+          return jd.getMonth() === d.getMonth() && jd.getFullYear() === d.getFullYear() && j.status === 'serviced';
+        }).reduce((s, j) => s + (j.price || 0), 0);
+        return { label, collected, pending };
+      });
+    }
+    if (view === 'year') {
+      // Last 12 months grouped by month
+      return Array.from({ length: 12 }, (_, i) => {
+        const d = new Date(now.getFullYear(), now.getMonth() - 11 + i, 1);
+        const label = d.toLocaleDateString('default', { month: 'short' });
+        const collected = jobs.filter(j => {
+          if (!j.completed_date) return false;
+          const jd = new Date(j.completed_date);
+          return jd.getMonth() === d.getMonth() && jd.getFullYear() === d.getFullYear() && ['complete','paid'].includes(j.status);
+        }).reduce((s, j) => s + (j.price || 0), 0);
+        const pending = jobs.filter(j => {
+          if (!j.completed_date) return false;
+          const jd = new Date(j.completed_date);
+          return jd.getMonth() === d.getMonth() && jd.getFullYear() === d.getFullYear() && j.status === 'serviced';
+        }).reduce((s, j) => s + (j.price || 0), 0);
+        return { label, collected, pending };
+      });
+    }
+    return [];
+  };
+
+  const data = buildData();
+  const maxVal = Math.max(...data.map(d => d.collected + d.pending), 1);
+  const chartH = 160;
+  const chartW = 100;
+  const pts_collected = data.map((d, i) => `${(i / (data.length - 1)) * chartW},${chartH - (d.collected / maxVal) * chartH}`).join(' ');
+  const pts_pending = data.map((d, i) => `${(i / (data.length - 1)) * chartW},${chartH - ((d.collected + d.pending) / maxVal) * chartH}`).join(' ');
+  const [hovered, setHovered] = useState(null);
+
+  return (
+    <div style={{ ...s.card({ marginBottom: 20 }) }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: expanded ? 16 : 0 }}>
+        <div style={{ fontWeight: 700, fontSize: 14 }}>📈 Revenue Over Time</div>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          {expanded && ['day','week','month','year'].map(v => (
+            <button key={v} onClick={() => setView(v)} style={{ ...s.btnGhost, background: view === v ? '#4f8ef7' : '#1a1a24', color: view === v ? 'white' : '#8888aa', border: 'none', fontSize: 11, padding: '4px 10px', textTransform: 'capitalize' }}>{v}</button>
+          ))}
+          <button onClick={() => setExpanded(!expanded)} style={{ ...s.btnGhost, fontSize: 11, padding: '4px 10px' }}>{expanded ? '▲ Hide' : '▼ Show'}</button>
+        </div>
+      </div>
+
+      {expanded && (
+        <>
+          <div style={{ display: 'flex', gap: 16, marginBottom: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+              <div style={{ width: 12, height: 3, background: '#f59e0b', borderRadius: 2 }} />
+              <span style={{ color: '#8888aa' }}>Pending</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+              <div style={{ width: 12, height: 3, background: '#10b981', borderRadius: 2 }} />
+              <span style={{ color: '#8888aa' }}>Collected</span>
+            </div>
+            {hovered !== null && (
+              <div style={{ marginLeft: 'auto', fontSize: 12, color: '#f0f0f8' }}>
+                <span style={{ color: '#8888aa' }}>{data[hovered]?.label}: </span>
+                <span style={{ color: '#10b981', fontWeight: 700 }}>${data[hovered]?.collected} </span>
+                <span style={{ color: '#f59e0b', fontWeight: 700 }}>+${data[hovered]?.pending} pending</span>
+              </div>
+            )}
+          </div>
+
+          <div style={{ position: 'relative', height: chartH + 30, width: '100%' }}>
+            <svg viewBox={`-2 -10 ${chartW + 4} ${chartH + 30}`} preserveAspectRatio="none" style={{ width: '100%', height: chartH + 10, overflow: 'visible' }}>
+              {/* Grid lines */}
+              {[0, 0.25, 0.5, 0.75, 1].map((p, i) => (
+                <g key={i}>
+                  <line x1="0" y1={chartH - p * chartH} x2={chartW} y2={chartH - p * chartH} stroke="#2a2a3a" strokeWidth="0.5" />
+                  <text x="-1" y={chartH - p * chartH + 1} fontSize="4" fill="#555570" textAnchor="end">${Math.round(maxVal * p)}</text>
+                </g>
+              ))}
+
+              {/* Pending area (collected + pending stacked) */}
+              <polyline points={pts_pending} fill="none" stroke="#f59e0b" strokeWidth="1.5" strokeOpacity="0.7" strokeDasharray="3 2" />
+
+              {/* Collected line */}
+              <polyline points={pts_collected} fill="none" stroke="#10b981" strokeWidth="2" />
+
+              {/* Dots + hover */}
+              {data.map((d, i) => {
+                const x = (i / (data.length - 1)) * chartW;
+                const yC = chartH - (d.collected / maxVal) * chartH;
+                return (
+                  <g key={i}>
+                    <circle cx={x} cy={yC} r="2" fill="#10b981" />
+                    <rect x={x - 4} y={0} width="8" height={chartH} fill="transparent"
+                      onMouseEnter={() => setHovered(i)}
+                      onMouseLeave={() => setHovered(null)}
+                    />
+                    {hovered === i && <line x1={x} y1={0} x2={x} y2={chartH} stroke="#4f8ef7" strokeWidth="0.5" strokeOpacity="0.5" />}
+                  </g>
+                );
+              })}
+            </svg>
+
+            {/* X axis labels */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: -4, paddingLeft: 20 }}>
+              {data.map((d, i) => (
+                <div key={i} style={{ fontSize: 10, color: hovered === i ? '#4f8ef7' : '#555570', textAlign: 'center', flex: 1 }}>{d.label}</div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function AdminDashboard({ pins, jobs, allUsers, onRefresh }) {
   const reps = allUsers.filter(u => u.role === 'rep');
   const techs = allUsers.filter(u => u.role === 'tech');
@@ -1061,6 +1224,9 @@ function AdminDashboard({ pins, jobs, allUsers, onRefresh }) {
             <div key={i} style={s.card()}><div style={{ fontSize: 11, color: '#8888aa', marginBottom: 4 }}>{st.l}</div><div style={{ fontWeight: 800, fontSize: 24, color: st.c }}>{st.v}</div></div>
           ))}
         </div>
+        {/* Revenue Chart */}
+        <RevenueChart jobs={jobs} />
+
         <div style={s.twoCol}>
           <div style={s.card()}>
             <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 16 }}>Rep Performance</div>
