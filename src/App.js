@@ -157,7 +157,6 @@ function AuthScreen({ onLogin }) {
 // ─── Door Log Modal ───────────────────────────────────────────────────────────
 function DoorLogModal({ pin, onClose, onSave, onDelete, techs, allJobs }) {
   const isMobile = useIsMobile();
-  const nowTime = new Date().toTimeString().slice(0,5);
   const [form, setForm] = useState({
     address: pin?.address || '',
     name: pin?.name || '',
@@ -166,7 +165,7 @@ function DoorLogModal({ pin, onClose, onSave, onDelete, techs, allJobs }) {
     price: pin?.price || '',
     notes: pin?.notes || '',
     follow_up_date: pin?.follow_up_date || new Date().toISOString().split('T')[0],
-    scheduled_time: pin?.scheduled_time || '',
+    scheduled_time: pin?.scheduled_time || new Date().toTimeString().slice(0,5),
     tech_id: pin?.tech_id || '',
     agreed: false,
   });
