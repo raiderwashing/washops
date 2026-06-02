@@ -285,15 +285,25 @@ function loadGoogleMaps() {
   });
 }
 
-function MapView({ pins, setPins, currentUser, allUsers, jobs, setJobs }) {
+function MapView({ pins, setPins, currentUser, allUsers, jobs, setJobs, zones, setZones }) {
   const [modal, setModal] = useState(null);
   const [mapReady, setMapReady] = useState(false);
+  const [drawingMode, setDrawingMode] = useState(false);
+  const [drawingPoints, setDrawingPoints] = useState([]);
+  const [zoneModal, setZoneModal] = useState(false);
+  const [pendingZone, setPendingZone] = useState(null);
+  const [zoneForm, setZoneForm] = useState({ name: '', repId: '' });
   const mapDivRef = React.useRef(null);
   const googleMapRef = React.useRef(null);
   const markersRef = React.useRef([]);
   const locationMarkerRef = React.useRef(null);
   const locationWatchRef = React.useRef(null);
+  const drawingPointsRef = React.useRef([]);
+  const tempMarkersRef = React.useRef([]);
+  const tempPolylineRef = React.useRef(null);
+  const zonePolygonsRef = React.useRef([]);
   const techs = allUsers.filter(u => u.role === 'tech');
+  const reps = allUsers.filter(u => u.role === 'rep' || u.role === 'admin');
   const visiblePins = currentUser.role === 'admin' ? pins : pins.filter(p => p.rep_id === currentUser.id);
 
   useEffect(() => {
@@ -387,7 +397,6 @@ function MapView({ pins, setPins, currentUser, allUsers, jobs, setJobs }) {
   // Render pins as markers on the map
   useEffect(() => {
     if (!googleMapRef.current || !mapReady) return;
-    // Clear old markers
     markersRef.current.forEach(m => m.setMap(null));
     markersRef.current = [];
     visiblePins.forEach(pin => {
@@ -405,10 +414,130 @@ function MapView({ pins, setPins, currentUser, allUsers, jobs, setJobs }) {
         },
         title: pin.address,
       });
-      marker.addListener('click', () => setModal(pin));
+      marker.addListener('click', () => { if (!drawingPointsRef.current.length) setModal(pin); });
       markersRef.current.push(marker);
     });
   }, [visiblePins, mapReady]);
+
+  // Render zone polygons on the map
+  useEffect(() => {
+    if (!googleMapRef.current || !mapReady || !zones) return;
+    zonePolygonsRef.current.forEach(p => p.setMap(null));
+    zonePolygonsRef.current = [];
+    zones.forEach(zone => {
+      const rep = allUsers.find(u => u.id === zone.rep_id);
+      const polygon = new window.google.maps.Polygon({
+        paths: zone.points,
+        strokeColor: '#4f8ef7',
+        strokeOpacity: 0.9,
+        strokeWeight: 2,
+        fillColor: '#1a3a6e',
+        fillOpacity: 0.2,
+        map: googleMapRef.current,
+      });
+      // Zone label
+      const bounds = new window.google.maps.LatLngBounds();
+      zone.points.forEach(p => bounds.extend(p));
+      const center = bounds.getCenter();
+      const label = new window.google.maps.Marker({
+        position: center,
+        map: googleMapRef.current,
+        icon: { path: window.google.maps.SymbolPath.CIRCLE, scale: 0 },
+        label: {
+          text: `${zone.name}${rep ? ' · ' + rep.name.split(' ')[0] : ''}`,
+          color: '#4f8ef7',
+          fontWeight: 'bold',
+          fontSize: '12px',
+        },
+        zIndex: 1,
+      });
+      zonePolygonsRef.current.push(polygon, label);
+    });
+  }, [zones, mapReady]);
+
+  // Handle drawing mode clicks
+  useEffect(() => {
+    if (!googleMapRef.current || !mapReady) return;
+    const listener = googleMapRef.current.addListener('click', (e) => {
+      if (!drawingPointsRef.current.length && !window._drawingActive) return;
+      if (!window._drawingActive) return;
+      const pt = { lat: e.latLng.lat(), lng: e.latLng.lng() };
+      drawingPointsRef.current = [...drawingPointsRef.current, pt];
+      setDrawingPoints([...drawingPointsRef.current]);
+
+      // Temp marker at each point
+      const m = new window.google.maps.Marker({
+        position: pt,
+        map: googleMapRef.current,
+        icon: { path: window.google.maps.SymbolPath.CIRCLE, scale: 5, fillColor: '#4f8ef7', fillOpacity: 1, strokeColor: 'white', strokeWeight: 2 },
+        zIndex: 10,
+      });
+      tempMarkersRef.current.push(m);
+
+      // Update polyline
+      if (tempPolylineRef.current) tempPolylineRef.current.setMap(null);
+      tempPolylineRef.current = new window.google.maps.Polyline({
+        path: drawingPointsRef.current,
+        strokeColor: '#4f8ef7',
+        strokeWeight: 2,
+        strokeOpacity: 0.8,
+        map: googleMapRef.current,
+      });
+    });
+    return () => window.google.maps.event.removeListener(listener);
+  }, [mapReady]);
+
+  const startDrawing = () => {
+    drawingPointsRef.current = [];
+    setDrawingPoints([]);
+    window._drawingActive = true;
+    setDrawingMode(true);
+    googleMapRef.current.setOptions({ cursor: 'crosshair' });
+  };
+
+  const finishDrawing = () => {
+    if (drawingPointsRef.current.length < 3) {
+      alert('Draw at least 3 points to create a zone');
+      return;
+    }
+    window._drawingActive = false;
+    setDrawingMode(false);
+    googleMapRef.current.setOptions({ cursor: '' });
+    setPendingZone(drawingPointsRef.current);
+    setZoneForm({ name: '', repId: '' });
+    setZoneModal(true);
+  };
+
+  const cancelDrawing = () => {
+    window._drawingActive = false;
+    setDrawingMode(false);
+    drawingPointsRef.current = [];
+    setDrawingPoints([]);
+    tempMarkersRef.current.forEach(m => m.setMap(null));
+    tempMarkersRef.current = [];
+    if (tempPolylineRef.current) tempPolylineRef.current.setMap(null);
+    googleMapRef.current.setOptions({ cursor: '' });
+  };
+
+  const saveZone = async () => {
+    if (!zoneForm.name) { alert('Give the zone a name'); return; }
+    const newZone = { name: zoneForm.name, rep_id: zoneForm.repId || null, points: pendingZone };
+    const { data: saved } = await supabase.from('zones').insert(newZone).select().single();
+    if (saved) setZones(zs => [...(zs || []), saved]);
+    // Clear temp drawing
+    tempMarkersRef.current.forEach(m => m.setMap(null));
+    tempMarkersRef.current = [];
+    if (tempPolylineRef.current) tempPolylineRef.current.setMap(null);
+    drawingPointsRef.current = [];
+    setDrawingPoints([]);
+    setZoneModal(false);
+    setPendingZone(null);
+  };
+
+  const deleteZone = async (zoneId) => {
+    await supabase.from('zones').delete().eq('id', zoneId);
+    setZones(zs => zs.filter(z => z.id !== zoneId));
+  };
 
   const handleSave = async (data) => {
     const jobPayload = {
@@ -526,12 +655,75 @@ function MapView({ pins, setPins, currentUser, allUsers, jobs, setJobs }) {
             🎯 Find Me
           </button>
         )}
-        {(currentUser.role === 'rep' || currentUser.role === 'admin') && mapReady && (
+
+        {/* Zone drawing controls — admin only */}
+        {currentUser.role === 'admin' && mapReady && !drawingMode && (
+          <button onClick={startDrawing} style={{ position: 'absolute', top: 100, right: 10, background: '#111118', border: '1px solid #4f8ef7', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#4f8ef7', cursor: 'pointer', zIndex: 10, fontWeight: 600, boxShadow: '0 2px 8px rgba(0,0,0,0.4)' }}>
+            🖊 Draw Zone
+          </button>
+        )}
+
+        {drawingMode && (
+          <div style={{ position: 'absolute', top: 100, right: 10, display: 'flex', flexDirection: 'column', gap: 6, zIndex: 10 }}>
+            <div style={{ background: 'rgba(79,142,247,0.15)', border: '1px solid #4f8ef7', borderRadius: 8, padding: '8px 12px', fontSize: 11, color: '#4f8ef7', textAlign: 'center' }}>
+              {drawingPoints.length} points · Double-click to finish
+            </div>
+            <button onClick={finishDrawing} style={{ background: '#10b981', border: 'none', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: 'white', cursor: 'pointer', fontWeight: 600 }}>
+              ✅ Finish Zone
+            </button>
+            <button onClick={cancelDrawing} style={{ background: '#1a1a24', border: '1px solid #ef4444', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#ef4444', cursor: 'pointer', fontWeight: 600 }}>
+              ✕ Cancel
+            </button>
+          </div>
+        )}
+
+        {/* Zone list — admin only */}
+        {currentUser.role === 'admin' && mapReady && zones && zones.length > 0 && !drawingMode && (
+          <div style={{ position: 'absolute', bottom: 40, right: 10, background: '#111118', border: '1px solid #2a2a3a', borderRadius: 10, padding: 12, zIndex: 10, maxWidth: 200 }}>
+            <div style={{ fontSize: 11, color: '#8888aa', fontWeight: 600, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Zones</div>
+            {zones.map(zone => {
+              const rep = allUsers.find(u => u.id === zone.rep_id);
+              return (
+                <div key={zone.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 600 }}>{zone.name}</div>
+                    <div style={{ fontSize: 11, color: '#8888aa' }}>{rep ? rep.name.split(' ')[0] : 'Unassigned'}</div>
+                  </div>
+                  <button onClick={() => deleteZone(zone.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 14, padding: '2px 6px' }}>🗑</button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {(currentUser.role === 'rep' || currentUser.role === 'admin') && mapReady && !drawingMode && (
           <div style={{ position: 'absolute', bottom: 14, left: '50%', transform: 'translateX(-50%)', background: '#111118', border: '1px solid #2a2a3a', borderRadius: 8, padding: '7px 14px', fontSize: 12, color: '#8888aa', zIndex: 10 }}>
             📍 Tap any house to log a door
           </div>
         )}
       </div>
+      {zoneModal && (
+        <div style={s.backdrop} onClick={e => e.target === e.currentTarget && setZoneModal(false)}>
+          <div style={{ ...s.modal, width: 380 }}>
+            <div style={{ fontWeight: 700, fontSize: 17, marginBottom: 20 }}>Name This Zone</div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={s.label}>Zone Name</label>
+              <input style={s.input} value={zoneForm.name} onChange={e => setZoneForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Maxey Ranch, Vintage Township" autoFocus />
+            </div>
+            <div style={{ marginBottom: 20 }}>
+              <label style={s.label}>Assign to Rep</label>
+              <select style={s.select} value={zoneForm.repId} onChange={e => setZoneForm(f => ({ ...f, repId: e.target.value }))}>
+                <option value="">— Unassigned —</option>
+                {reps.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+              </select>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button style={{ ...s.btnGhost, flex: 1 }} onClick={() => { setZoneModal(false); cancelDrawing(); }}>Cancel</button>
+              <button style={{ ...s.btnAccent, flex: 2, padding: 10 }} onClick={saveZone}>Save Zone</button>
+            </div>
+          </div>
+        </div>
+      )}
       {modal && <DoorLogModal pin={modal} onClose={() => setModal(null)} onSave={handleSave} techs={techs} allJobs={jobs} onDelete={async (id) => {
         const pin = pins.find(p => p.id === id);
         // Delete pin
@@ -1185,6 +1377,7 @@ export default function App() {
   const [pins, setPins] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
+  const [zones, setZones] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Load data from Supabase on login
@@ -1192,14 +1385,16 @@ export default function App() {
     if (!user) { setLoading(false); return; }
     const loadData = async () => {
       setLoading(true);
-      const [{ data: usersData }, { data: pinsData }, { data: jobsData }] = await Promise.all([
+      const [{ data: usersData }, { data: pinsData }, { data: jobsData }, { data: zonesData }] = await Promise.all([
         supabase.from('users').select('*'),
         supabase.from('pins').select('*').order('created_at', { ascending: false }),
         supabase.from('jobs').select('*').order('created_at', { ascending: false }),
+        supabase.from('zones').select('*'),
       ]);
       setAllUsers(usersData || []);
       setPins(pinsData || []);
       setJobs(jobsData || []);
+      setZones(zonesData || []);
       setLoading(false);
     };
     loadData();
@@ -1250,7 +1445,7 @@ export default function App() {
   const roleColor = { admin: '#4f8ef7', rep: '#10b981', tech: '#f59e0b' }[user.role];
 
   const renderPage = () => {
-    if (page === 'map') return <MapView pins={pins} setPins={setPins} currentUser={user} allUsers={allUsers} jobs={jobs} setJobs={setJobs} />;
+    if (page === 'map') return <MapView pins={pins} setPins={setPins} currentUser={user} allUsers={allUsers} jobs={jobs} setJobs={setJobs} zones={zones} setZones={setZones} />;
     if (page === 'schedule') return <ScheduleView jobs={jobs} setJobs={setJobs} currentUser={user} allUsers={allUsers} />;
     if (page === 'dashboard') return user.role === 'admin' ? <AdminDashboard pins={pins} jobs={jobs} allUsers={allUsers} /> : <RepDashboard pins={pins} jobs={jobs} currentUser={user} />;
     if (page === 'jobs') return <TechDashboard jobs={jobs} setJobs={setJobs} currentUser={user} />;
