@@ -302,6 +302,7 @@ function MapView({ pins, setPins, currentUser, allUsers, jobs, setJobs, zones, s
   const tempMarkersRef = React.useRef([]);
   const tempPolylineRef = React.useRef(null);
   const zonePolygonsRef = React.useRef([]);
+  const finishDrawingRef = React.useRef(null);
   const techs = allUsers.filter(u => u.role === 'tech');
   const reps = allUsers.filter(u => u.role === 'rep' || u.role === 'admin');
   const visiblePins = currentUser.role === 'admin' ? pins : pins.filter(p => p.rep_id === currentUser.id);
@@ -358,7 +359,8 @@ function MapView({ pins, setPins, currentUser, allUsers, jobs, setJobs, zones, s
 
       // Click to drop pin — works for rep and admin clicking on behalf
       map.addListener('click', async (e) => {
-        if (currentUser.role === 'tech') return; // techs can't drop pins
+        if (currentUser.role === 'tech') return;
+        if (window._drawingActive) return; // block pin drops during zone drawing
         const lat = e.latLng.lat();
         const lng = e.latLng.lng();
 
@@ -419,19 +421,24 @@ function MapView({ pins, setPins, currentUser, allUsers, jobs, setJobs, zones, s
     });
   }, [visiblePins, mapReady]);
 
-  // Render zone polygons on the map
+  // Render zone polygons on the map - visible to all roles
   useEffect(() => {
     if (!googleMapRef.current || !mapReady || !zones) return;
     zonePolygonsRef.current.forEach(p => p.setMap(null));
     zonePolygonsRef.current = [];
-    zones.forEach(zone => {
+    // Show all zones to admin, only assigned zones to reps
+    const visibleZones = currentUser.role === 'admin' 
+      ? zones 
+      : zones.filter(z => !z.rep_id || z.rep_id === currentUser.id);
+    visibleZones.forEach(zone => {
       const rep = allUsers.find(u => u.id === zone.rep_id);
+      const isMyZone = zone.rep_id === currentUser.id;
       const polygon = new window.google.maps.Polygon({
         paths: zone.points,
-        strokeColor: '#4f8ef7',
+        strokeColor: isMyZone ? '#10b981' : '#4f8ef7',
         strokeOpacity: 0.9,
-        strokeWeight: 2,
-        fillColor: '#1a3a6e',
+        strokeWeight: isMyZone ? 3 : 2,
+        fillColor: isMyZone ? '#0a3328' : '#1a3a6e',
         fillOpacity: 0.2,
         map: googleMapRef.current,
       });
@@ -455,17 +462,17 @@ function MapView({ pins, setPins, currentUser, allUsers, jobs, setJobs, zones, s
     });
   }, [zones, mapReady]);
 
-  // Handle drawing mode clicks
+  // Handle drawing mode clicks and double-click to close
   useEffect(() => {
     if (!googleMapRef.current || !mapReady) return;
-    const listener = googleMapRef.current.addListener('click', (e) => {
-      if (!drawingPointsRef.current.length && !window._drawingActive) return;
+
+    const clickListener = googleMapRef.current.addListener('click', (e) => {
       if (!window._drawingActive) return;
       const pt = { lat: e.latLng.lat(), lng: e.latLng.lng() };
       drawingPointsRef.current = [...drawingPointsRef.current, pt];
       setDrawingPoints([...drawingPointsRef.current]);
 
-      // Temp marker at each point
+      // Small dot at each click point
       const m = new window.google.maps.Marker({
         position: pt,
         map: googleMapRef.current,
@@ -474,17 +481,33 @@ function MapView({ pins, setPins, currentUser, allUsers, jobs, setJobs, zones, s
       });
       tempMarkersRef.current.push(m);
 
-      // Update polyline
+      // Update live polyline preview
       if (tempPolylineRef.current) tempPolylineRef.current.setMap(null);
       tempPolylineRef.current = new window.google.maps.Polyline({
-        path: drawingPointsRef.current,
+        path: [...drawingPointsRef.current, drawingPointsRef.current[0]], // close back to start
         strokeColor: '#4f8ef7',
         strokeWeight: 2,
         strokeOpacity: 0.8,
+        strokeDashArray: '8 4',
         map: googleMapRef.current,
       });
     });
-    return () => window.google.maps.event.removeListener(listener);
+
+    // Double-click to auto-finish zone
+    const dblClickListener = googleMapRef.current.addListener('dblclick', (e) => {
+      if (!window._drawingActive) return;
+      if (drawingPointsRef.current.length < 3) {
+        alert('Click at least 3 points to create a zone');
+        return;
+      }
+      window.google.maps.event.removeListener(clickListener);
+      finishDrawingRef.current();
+    });
+
+    return () => {
+      window.google.maps.event.removeListener(clickListener);
+      window.google.maps.event.removeListener(dblClickListener);
+    };
   }, [mapReady]);
 
   const startDrawing = () => {
@@ -503,10 +526,13 @@ function MapView({ pins, setPins, currentUser, allUsers, jobs, setJobs, zones, s
     window._drawingActive = false;
     setDrawingMode(false);
     googleMapRef.current.setOptions({ cursor: '' });
-    setPendingZone(drawingPointsRef.current);
+    // Clear temp polyline
+    if (tempPolylineRef.current) { tempPolylineRef.current.setMap(null); tempPolylineRef.current = null; }
+    setPendingZone([...drawingPointsRef.current]);
     setZoneForm({ name: '', repId: '' });
     setZoneModal(true);
   };
+  finishDrawingRef.current = finishDrawing;
 
   const cancelDrawing = () => {
     window._drawingActive = false;
