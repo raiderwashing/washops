@@ -1035,7 +1035,13 @@ function AdminDashboard({ pins, jobs, allUsers, onRefresh }) {
   const serviced = jobs.filter(j => j.status === 'serviced').length;
   const conv = pins.length ? Math.round(pins.filter(p => ['closed','paid','appointment'].includes(p.status)).length / pins.length * 100) : 0;
   const knockers = [...reps, ...allUsers.filter(u => u.role === 'admin')];
-  const repStats = knockers.map(r => ({ ...r, knocked: pins.filter(p => String(p.rep_id) === String(r.id)).length, closed: pins.filter(p => String(p.rep_id) === String(r.id) && ['closed','paid'].includes(p.status)).length, rev: jobs.filter(j => String(j.rep_id) === String(r.id) && ['complete','paid','serviced'].includes(j.status)).reduce((s, j) => s + (j.price || 0), 0) }));
+  const repStats = knockers.map(r => ({
+    ...r,
+    knocked: pins.filter(p => String(p.rep_id) === String(r.id)).length,
+    closed: pins.filter(p => String(p.rep_id) === String(r.id) && ['closed','paid'].includes(p.status)).length,
+    pipeline: jobs.filter(j => String(j.rep_id) === String(r.id) && ['scheduled','appointment'].includes(j.status)).reduce((s, j) => s + (j.price || 0), 0),
+    collected: jobs.filter(j => String(j.rep_id) === String(r.id) && ['serviced','complete','paid'].includes(j.status)).reduce((s, j) => s + (j.price || 0), 0),
+  }));
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -1060,15 +1066,22 @@ function AdminDashboard({ pins, jobs, allUsers, onRefresh }) {
             <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 16 }}>Rep Performance</div>
             {repStats.length === 0 && <div style={{ color: '#555570', fontSize: 13 }}>No reps yet</div>}
             {repStats.map(r => (
-              <div key={r.id} style={{ marginBottom: 16 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Avatar name={r.name} role="rep" size={24} /><span style={{ fontSize: 13, fontWeight: 500 }}>{r.name}</span></div>
-                  <span style={{ fontSize: 12, color: '#10b981', fontWeight: 600 }}>${r.rev}</span>
+              <div key={r.id} style={{ marginBottom: 16, padding: 12, background: '#1a1a24', borderRadius: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Avatar name={r.name} role="rep" size={24} /><span style={{ fontSize: 13, fontWeight: 600 }}>{r.name}</span></div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 10, color: '#8888aa' }}>Pipeline</div>
+                    <div style={{ fontSize: 13, color: '#f59e0b', fontWeight: 700 }}>${r.pipeline || 0}</div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 10, color: '#8888aa' }}>Collected</div>
+                    <div style={{ fontSize: 13, color: '#10b981', fontWeight: 700 }}>${r.collected || 0}</div>
+                  </div>
                 </div>
                 {[['Knocked', r.knocked, 10, '#8888aa'], ['Closed', r.closed, 25, '#10b981']].map(([label, val, mult, color]) => (
                   <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
                     <span style={{ fontSize: 11, color: '#555570', width: 60 }}>{label}</span>
-                    <div style={{ flex: 1, height: 5, background: '#1a1a24', borderRadius: 3, overflow: 'hidden' }}><div style={{ width: `${Math.min(val * mult, 100)}%`, height: '100%', background: color, borderRadius: 3 }} /></div>
+                    <div style={{ flex: 1, height: 5, background: '#0a0a0f', borderRadius: 3, overflow: 'hidden' }}><div style={{ width: `${Math.min(val * mult, 100)}%`, height: '100%', background: color, borderRadius: 3 }} /></div>
                     <span style={{ fontSize: 11, color: '#8888aa', width: 20, textAlign: 'right' }}>{val}</span>
                   </div>
                 ))}
@@ -1139,10 +1152,9 @@ function RepDashboard({ pins, jobs, currentUser }) {
 
 // ─── Tech Dashboard ───────────────────────────────────────────────────────────
 function TechDashboard({ jobs, setJobs, currentUser }) {
-  const my = jobs.filter(j => String(j.tech_id) === String(currentUser.id));
+  const my = jobs.filter(j => j.tech_id && String(j.tech_id).trim() === String(currentUser.id).trim());
   const pending = my.filter(j => j.status === 'scheduled');
   const done = my.filter(j => ['serviced','complete','paid'].includes(j.status));
-  console.log('Tech jobs:', my.length, 'pending:', pending.length, 'done:', done.length, 'currentUser:', currentUser.id);
 
   const markServiced = async (job) => {
     const now = new Date();
