@@ -1634,7 +1634,7 @@ function PayrollView({ jobs, allUsers, setAllUsers }) {
 
   // Get all complete jobs for a user (as rep or tech)
   const getEarnings = (user) => {
-    const completeJobs = jobs.filter(j => ['complete', 'paid'].includes(j.status));
+    const completeJobs = jobs.filter(j => ['complete', 'paid', 'serviced'].includes(j.status));
     
     const repJobs = completeJobs.filter(j => String(j.rep_id) === String(user.id));
     const techJobs = completeJobs.filter(j => String(j.tech_id) === String(user.id));
@@ -1673,7 +1673,7 @@ function PayrollView({ jobs, allUsers, setAllUsers }) {
   };
 
   const totalPayroll = workers.reduce((s, u) => s + getEarnings(u).total, 0);
-  const completeJobs = jobs.filter(j => ['complete','paid'].includes(j.status));
+  const completeJobs = jobs.filter(j => ['complete','paid','serviced'].includes(j.status));
   const totalRevenue = completeJobs.reduce((s, j) => s + (j.price || 0), 0);
 
   return (
@@ -1758,7 +1758,7 @@ function PayrollView({ jobs, allUsers, setAllUsers }) {
 
         {/* Job breakdown per person */}
         {workers.map(user => {
-          const userJobs = jobs.filter(j => ['complete','paid'].includes(j.status) && (String(j.rep_id) === String(user.id) || String(j.tech_id) === String(user.id)));
+          const userJobs = jobs.filter(j => ['complete','paid','serviced'].includes(j.status) && (String(j.rep_id) === String(user.id) || String(j.tech_id) === String(user.id)));
           if (userJobs.length === 0) return null;
           const e = getEarnings(user);
           return (
