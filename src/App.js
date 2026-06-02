@@ -468,6 +468,7 @@ function MapView({ pins, setPins, currentUser, allUsers, jobs, setJobs, zones, s
         strokeWeight: isMyZone ? 3 : 2,
         fillColor: isMyZone ? '#0a3328' : '#1a3a6e',
         fillOpacity: 0.2,
+        clickable: false,
         map: googleMapRef.current,
       });
       // Zone label
