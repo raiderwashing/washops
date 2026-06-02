@@ -157,7 +157,7 @@ function AuthScreen({ onLogin }) {
 
 // ─── Door Log Modal ───────────────────────────────────────────────────────────
 function DoorLogModal({ pin, onClose, onSave, onDelete, techs, allJobs }) {
-  const isMobile = useIsMobile();
+  const isMobile = false;
   const [form, setForm] = useState({
     address: pin?.address || '',
     name: pin?.name || '',
@@ -783,7 +783,7 @@ function MapView({ pins, setPins, currentUser, allUsers, jobs, setJobs, zones, s
 
 // ─── Schedule View ────────────────────────────────────────────────────────────
 function ScheduleView({ jobs, setJobs, currentUser, allUsers }) {
-  const isMobile = useIsMobile();
+  const isMobile = false;
   const [selected, setSelected] = useState(null);
   const [view, setView] = useState('month'); // month | week | day
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -1233,7 +1233,7 @@ function RevenueChart({ jobs }) {
 }
 
 function AdminDashboard({ pins, jobs, allUsers, onRefresh }) {
-  const isMobile = useIsMobile();
+  const isMobile = false;
   const reps = allUsers.filter(u => u.role === 'rep');
   const techs = allUsers.filter(u => u.role === 'tech');
   const pendingRevenue = jobs.filter(j => j.status === 'serviced').reduce((s, j) => s + (j.price || 0), 0);
@@ -1328,7 +1328,7 @@ function AdminDashboard({ pins, jobs, allUsers, onRefresh }) {
 
 // ─── Rep Dashboard ────────────────────────────────────────────────────────────
 function RepDashboard({ pins, jobs, currentUser }) {
-  const isMobile = useIsMobile();
+  const isMobile = false;
   const my = pins.filter(p => String(p.rep_id) === String(currentUser.id));
   const knocked = my.length, appts = my.filter(p => p.status === 'appointment').length, closed = my.filter(p => ['closed','paid'].includes(p.status)).length;
   const rev = jobs.filter(j => j.rep_id === currentUser.id && ['complete','paid'].includes(j.status)).reduce((s, j) => s + (j.price || 0), 0);
@@ -1363,7 +1363,7 @@ function RepDashboard({ pins, jobs, currentUser }) {
 
 // ─── Tech Dashboard ───────────────────────────────────────────────────────────
 function TechDashboard({ jobs, setJobs, currentUser }) {
-  const isMobile = useIsMobile();
+  const isMobile = false;
   const my = jobs.filter(j => j.tech_id && String(j.tech_id).trim() === String(currentUser.id).trim());
   const pending = my.filter(j => j.status === 'scheduled');
   const done = my.filter(j => ['serviced','complete','paid'].includes(j.status));
