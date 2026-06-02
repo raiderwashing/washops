@@ -1127,11 +1127,11 @@ function RevenueChart({ jobs }) {
         <>
           <div style={{ display: 'flex', gap: 16, marginBottom: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
-              <div style={{ width: 12, height: 3, background: '#f59e0b', borderRadius: 2 }} />
+              <div style={{ width: 12, height: 3, background: '#10b981', borderRadius: 2 }} />
               <span style={{ color: '#8888aa' }}>Pending</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
-              <div style={{ width: 12, height: 3, background: '#10b981', borderRadius: 2 }} />
+              <div style={{ width: 12, height: 3, background: '#f59e0b', borderRadius: 2 }} />
               <span style={{ color: '#8888aa' }}>Collected</span>
             </div>
             {hovered !== null && (
@@ -1164,15 +1164,15 @@ function RevenueChart({ jobs }) {
                 };
                 return (
                   <>
-                    {/* Pending area fill */}
-                    <path d={toPath(pts_pending, true)} fill="#f59e0b" fillOpacity="0.12" />
-                    {/* Pending solid line */}
-                    <path d={toPath(pts_pending)} fill="none" stroke="#f59e0b" strokeWidth="2" />
+                    {/* Collected area fill - yellow, bottom */}
+                    <path d={toPath(pts_collected, true)} fill="#f59e0b" fillOpacity="0.1" />
+                    {/* Collected solid line - yellow */}
+                    <path d={toPath(pts_collected)} fill="none" stroke="#f59e0b" strokeWidth="1.5" />
 
-                    {/* Collected area fill */}
-                    <path d={toPath(pts_collected, true)} fill="#10b981" fillOpacity="0.15" />
-                    {/* Collected solid line */}
-                    <path d={toPath(pts_collected)} fill="none" stroke="#10b981" strokeWidth="2.5" />
+                    {/* Pending area fill - green, top */}
+                    <path d={toPath(pts_pending, true)} fill="#10b981" fillOpacity="0.1" />
+                    {/* Pending solid line - green */}
+                    <path d={toPath(pts_pending)} fill="none" stroke="#10b981" strokeWidth="1.5" />
                   </>
                 );
               })()}
@@ -1183,7 +1183,7 @@ function RevenueChart({ jobs }) {
                 const yC = chartH - (d.collected / maxVal) * chartH;
                 return (
                   <g key={i}>
-                    <circle cx={x} cy={yC} r="2" fill="#10b981" />
+                    <circle cx={x} cy={yC} r="2" fill="#f59e0b" />
                     <rect x={x - 4} y={0} width="8" height={chartH} fill="transparent"
                       onMouseEnter={() => setHovered(i)}
                       onMouseLeave={() => setHovered(null)}
