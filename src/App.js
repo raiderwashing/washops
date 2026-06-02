@@ -13,9 +13,9 @@ const s = {
   main: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
   topbar: { background: '#111118', borderBottom: '1px solid #2a2a3a', padding: '0 20px', height: 52, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 },
   topbarTitle: { fontWeight: 700, fontSize: 15 },
-  page: { flex: 1, overflowY: 'auto', padding: 20 },
+  page: { flex: 1, overflowY: 'auto', padding: 20 }, // use inline padding for mobile
   card: (extra = {}) => ({ background: '#111118', border: '1px solid #2a2a3a', borderRadius: 12, padding: 18, ...extra }),
-  statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 },
+  statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }, // desktop only - use inline for mobile
   twoCol: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 },
   input: { width: '100%', background: '#1a1a24', border: '1px solid #2a2a3a', borderRadius: 8, padding: '10px 12px', color: '#f0f0f8', fontSize: 13, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' },
   select: { width: '100%', background: '#1a1a24', border: '1px solid #2a2a3a', borderRadius: 8, padding: '10px 12px', color: '#f0f0f8', fontSize: 13, outline: 'none', fontFamily: 'inherit', appearance: 'none', cursor: 'pointer' },
@@ -48,6 +48,48 @@ const STATUS_CONFIG = {
 };
 
 const PIN_COLORS = { 'not-interested': '#ef4444', 'not-home': '#e879f9', 'follow-up': '#f59e0b', appointment: '#10b981', closed: '#4f8ef7', paid: '#7c3aed' };
+
+// Mobile detection hook
+function useIsMobile() {
+  const [isMobile, setIsMobile] = React.useState(window.innerWidth <= 768);
+  React.useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+  return isMobile;
+}
+
+// Mobile styles injected into head
+if (!document.getElementById('washops-mobile-styles')) {
+  const style = document.createElement('style');
+  style.id = 'washops-mobile-styles';
+  style.textContent = `
+    * { -webkit-tap-highlight-color: transparent; }
+    input, select, textarea { font-size: 16px !important; }
+    .mobile-modal {
+      position: fixed !important;
+      inset: 0 !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      max-height: 100% !important;
+      border-radius: 0 !important;
+      margin: 0 !important;
+    }
+    .mobile-modal-sheet {
+      position: fixed !important;
+      bottom: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      max-height: 90vh !important;
+      border-radius: 16px 16px 0 0 !important;
+      overflow-y: auto !important;
+    }
+  `;
+  document.head.appendChild(style);
+}
 
 const AGREEMENT_ONETIME = `ONE-TIME WINDOW CLEANING SERVICE AGREEMENT — RAIDER WASHING
 
@@ -134,6 +176,7 @@ function AuthScreen({ onLogin }) {
 
 // ─── Door Log Modal ───────────────────────────────────────────────────────────
 function DoorLogModal({ pin, onClose, onSave, onDelete, techs, allJobs }) {
+  const isMobile = useIsMobile();
   const nowTime = new Date().toTimeString().slice(0,5);
   const [form, setForm] = useState({
     address: pin?.address || '',
@@ -176,7 +219,7 @@ function DoorLogModal({ pin, onClose, onSave, onDelete, techs, allJobs }) {
   };
 
   return (
-    <div style={s.backdrop} onClick={e => e.target === e.currentTarget && onClose()}>
+    <div style={isMobile ? { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 100, display: 'flex', alignItems: 'flex-end' } : s.backdrop} onClick={e => e.target === e.currentTarget && onClose()}>
       <div style={s.modal}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <div style={{ fontWeight: 700, fontSize: 17 }}>{pin?.id ? 'Edit Door Log' : 'New Door Log'}</div>
@@ -760,6 +803,7 @@ function MapView({ pins, setPins, currentUser, allUsers, jobs, setJobs, zones, s
 
 // ─── Schedule View ────────────────────────────────────────────────────────────
 function ScheduleView({ jobs, setJobs, currentUser, allUsers }) {
+  const isMobile = useIsMobile();
   const [selected, setSelected] = useState(null);
   const [view, setView] = useState('month'); // month | week | day
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -930,20 +974,20 @@ function ScheduleView({ jobs, setJobs, currentUser, allUsers }) {
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      <div style={s.topbar}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button onClick={() => navigate(-1)} style={{ ...s.btnGhost, padding: '4px 10px' }}>‹</button>
-          <div style={{ fontWeight: 700, fontSize: 14, minWidth: 200, textAlign: 'center' }}>{headerLabel()}</div>
-          <button onClick={() => navigate(1)} style={{ ...s.btnGhost, padding: '4px 10px' }}>›</button>
+      <div style={{ ...s.topbar, flexWrap: isMobile ? 'wrap' : 'nowrap', height: isMobile ? 'auto' : 52, padding: isMobile ? '8px 12px' : '0 20px', gap: isMobile ? 8 : 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 6 : 12 }}>
+          <button onClick={() => navigate(-1)} style={{ ...s.btnGhost, padding: '4px 8px' }}>‹</button>
+          <div style={{ fontWeight: 700, fontSize: isMobile ? 12 : 14, minWidth: isMobile ? 120 : 200, textAlign: 'center' }}>{headerLabel()}</div>
+          <button onClick={() => navigate(1)} style={{ ...s.btnGhost, padding: '4px 8px' }}>›</button>
           <button onClick={() => setCurrentDate(new Date())} style={{ ...s.btnGhost, fontSize: 11 }}>Today</button>
         </div>
         <div style={{ display: 'flex', gap: 4 }}>
           {['month','week','day'].map(v => (
-            <button key={v} onClick={() => setView(v)} style={{ ...s.btnGhost, background: view === v ? '#4f8ef7' : '#1a1a24', color: view === v ? 'white' : '#8888aa', border: 'none', textTransform: 'capitalize', fontSize: 12 }}>{v}</button>
+            <button key={v} onClick={() => setView(v)} style={{ ...s.btnGhost, background: view === v ? '#4f8ef7' : '#1a1a24', color: view === v ? 'white' : '#8888aa', border: 'none', textTransform: 'capitalize', fontSize: isMobile ? 11 : 12, padding: isMobile ? '4px 8px' : '7px 14px' }}>{v}</button>
           ))}
         </div>
       </div>
-      <div style={s.page}>
+      <div style={{ ...s.page, padding: isMobile ? 12 : 20 }}>
         {currentUser.role === 'rep' && (
           <div style={{ ...s.card(), marginBottom: 20 }}>
             <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 12 }}>🧑‍🔧 Tech Availability</div>
@@ -978,7 +1022,7 @@ function ScheduleView({ jobs, setJobs, currentUser, allUsers }) {
       </div>
       {selected && (
         <div style={s.backdrop} onClick={e => e.target === e.currentTarget && setSelected(null)}>
-          <div style={s.modal}>
+          <div style={isMobile ? { background: '#111118', border: '1px solid #2a2a3a', borderRadius: '16px 16px 0 0', padding: 24, width: '100%', maxHeight: '92vh', overflowY: 'auto', position: 'fixed', bottom: 0, left: 0, right: 0 } : s.modal}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
               <div style={{ fontWeight: 700, fontSize: 17 }}>Job Details</div>
               <button onClick={() => setSelected(null)} style={{ background: '#1a1a24', border: 'none', color: '#8888aa', width: 28, height: 28, borderRadius: 6, cursor: 'pointer', fontSize: 16 }}>×</button>
@@ -1208,6 +1252,7 @@ function RevenueChart({ jobs }) {
 }
 
 function AdminDashboard({ pins, jobs, allUsers, onRefresh }) {
+  const isMobile = useIsMobile();
   const reps = allUsers.filter(u => u.role === 'rep');
   const techs = allUsers.filter(u => u.role === 'tech');
   const pendingRevenue = jobs.filter(j => j.status === 'serviced').reduce((s, j) => s + (j.price || 0), 0);
@@ -1231,21 +1276,21 @@ function AdminDashboard({ pins, jobs, allUsers, onRefresh }) {
         <button style={s.btnGhost} onClick={onRefresh}>🔄 Refresh</button>
       </div>
       <div style={s.page}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 12, marginBottom: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(5,1fr)', gap: isMobile ? 8 : 12, marginBottom: isMobile ? 16 : 20 }}>
           {[
             { l: '⭐ Complete ⭐', v: `$${revenue}`, c: '#f59e0b' },
-            { l: 'Pending Revenue', v: `$${pendingRevenue}`, c: '#10b981' },
+            { l: 'Pending Rev', v: `$${pendingRevenue}`, c: '#10b981' },
             { l: 'Scheduled', v: scheduled, c: '#4f8ef7' },
             { l: 'Serviced', v: serviced, c: '#10b981' },
-            { l: 'Conversion Rate', v: `${conv}%`, c: '#f0f0f8' },
+            { l: 'Conversion', v: `${conv}%`, c: '#f0f0f8' },
           ].map((st, i) => (
-            <div key={i} style={s.card()}><div style={{ fontSize: 11, color: '#8888aa', marginBottom: 4 }}>{st.l}</div><div style={{ fontWeight: 800, fontSize: 24, color: st.c }}>{st.v}</div></div>
+            <div key={i} style={s.card()}><div style={{ fontSize: isMobile ? 10 : 11, color: '#8888aa', marginBottom: 4 }}>{st.l}</div><div style={{ fontWeight: 800, fontSize: isMobile ? 20 : 24, color: st.c }}>{st.v}</div></div>
           ))}
         </div>
         {/* Revenue Chart */}
         <RevenueChart jobs={jobs} />
 
-        <div style={s.twoCol}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12, marginBottom: 16 }}>
           <div style={s.card()}>
             <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 16 }}>Rep Performance</div>
             {repStats.length === 0 && <div style={{ color: '#555570', fontSize: 13 }}>No reps yet</div>}
@@ -1302,6 +1347,7 @@ function AdminDashboard({ pins, jobs, allUsers, onRefresh }) {
 
 // ─── Rep Dashboard ────────────────────────────────────────────────────────────
 function RepDashboard({ pins, jobs, currentUser }) {
+  const isMobile = useIsMobile();
   const my = pins.filter(p => String(p.rep_id) === String(currentUser.id));
   const knocked = my.length, appts = my.filter(p => p.status === 'appointment').length, closed = my.filter(p => ['closed','paid'].includes(p.status)).length;
   const rev = jobs.filter(j => j.rep_id === currentUser.id && ['complete','paid'].includes(j.status)).reduce((s, j) => s + (j.price || 0), 0);
@@ -1309,8 +1355,8 @@ function RepDashboard({ pins, jobs, currentUser }) {
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <div style={s.topbar}><div style={s.topbarTitle}>📈 My Stats</div></div>
       <div style={s.page}>
-        <div style={s.statsGrid}>
-          {[{ l: 'Knocked', v: knocked, c: '#f0f0f8' }, { l: 'Appts Set', v: appts, c: '#f59e0b' }, { l: 'Closed', v: closed, c: '#4f8ef7' }, { l: 'Revenue', v: `$${rev}`, c: '#10b981' }].map((st, i) => <div key={i} style={s.card()}><div style={{ fontSize: 11, color: '#8888aa', marginBottom: 4 }}>{st.l}</div><div style={{ fontWeight: 800, fontSize: 26, color: st.c }}>{st.v}</div></div>)}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: isMobile ? 8 : 12, marginBottom: isMobile ? 16 : 20 }}>
+          {[{ l: 'Knocked', v: knocked, c: '#f0f0f8' }, { l: 'Appts Set', v: appts, c: '#f59e0b' }, { l: 'Closed', v: closed, c: '#4f8ef7' }, { l: 'Revenue', v: `$${rev}`, c: '#10b981' }].map((st, i) => <div key={i} style={s.card()}><div style={{ fontSize: 11, color: '#8888aa', marginBottom: 4 }}>{st.l}</div><div style={{ fontWeight: 800, fontSize: isMobile ? 22 : 26, color: st.c }}>{st.v}</div></div>)}
         </div>
         <div style={{ ...s.card(), marginBottom: 20 }}>
           <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 14 }}>Conversion Funnel</div>
@@ -1336,6 +1382,7 @@ function RepDashboard({ pins, jobs, currentUser }) {
 
 // ─── Tech Dashboard ───────────────────────────────────────────────────────────
 function TechDashboard({ jobs, setJobs, currentUser }) {
+  const isMobile = useIsMobile();
   const my = jobs.filter(j => j.tech_id && String(j.tech_id).trim() === String(currentUser.id).trim());
   const pending = my.filter(j => j.status === 'scheduled');
   const done = my.filter(j => ['serviced','complete','paid'].includes(j.status));
@@ -1360,7 +1407,7 @@ function TechDashboard({ jobs, setJobs, currentUser }) {
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <div style={s.topbar}><div style={s.topbarTitle}>🔧 My Jobs</div></div>
-      <div style={s.page}>
+      <div style={{ ...s.page, padding: isMobile ? 12 : 20 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
           <div style={s.card()}><div style={{ fontSize: 11, color: '#8888aa', marginBottom: 4 }}>Pending</div><div style={{ fontWeight: 800, fontSize: 26, color: '#f59e0b' }}>{pending.length}</div></div>
           <div style={s.card()}><div style={{ fontSize: 11, color: '#8888aa', marginBottom: 4 }}>Completed</div><div style={{ fontWeight: 800, fontSize: 26, color: '#10b981' }}>{done.length}</div></div>
@@ -1372,7 +1419,7 @@ function TechDashboard({ jobs, setJobs, currentUser }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}><div style={{ fontWeight: 700 }}>{j.customer_name}</div><Badge status={j.status} /></div>
             <div style={{ fontSize: 12, color: '#8888aa', marginBottom: 2 }}>📍 {j.address}</div>
             <div style={{ fontSize: 12, color: '#8888aa', marginBottom: 12 }}>📅 {j.scheduled_date || '—'} {j.scheduled_time && `· ${j.scheduled_time}`} · <span style={{ textTransform: 'capitalize' }}>{j.service}</span> · ${j.price}</div>
-            <button style={{ ...s.btnGreen, width: '100%', padding: 10 }} onClick={() => markServiced(j)}>✅ Mark as Serviced</button>
+            <button style={{ ...s.btnGreen, width: '100%', padding: isMobile ? 14 : 10, fontSize: isMobile ? 15 : 12 }} onClick={() => markServiced(j)}>✅ Mark as Serviced</button>
           </div>
         ))}
         {done.length > 0 && <>
@@ -1577,7 +1624,7 @@ function TeamView({ allUsers, setAllUsers }) {
       {/* Add/Edit Modal */}
       {showModal && (
         <div style={s.backdrop} onClick={e => e.target === e.currentTarget && setShowModal(false)}>
-          <div style={s.modal}>
+          <div style={isMobile ? { background: '#111118', border: '1px solid #2a2a3a', borderRadius: '16px 16px 0 0', padding: 24, width: '100%', maxHeight: '92vh', overflowY: 'auto', position: 'fixed', bottom: 0, left: 0, right: 0 } : s.modal}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <div style={{ fontWeight: 700, fontSize: 17 }}>{editUser ? 'Edit Team Member' : 'Add Team Member'}</div>
               <button onClick={() => setShowModal(false)} style={{ background: '#1a1a24', border: 'none', color: '#8888aa', width: 28, height: 28, borderRadius: 6, cursor: 'pointer', fontSize: 16 }}>×</button>
@@ -1908,6 +1955,7 @@ export default function App() {
   };
 
   const roleColor = { admin: '#4f8ef7', rep: '#10b981', tech: '#f59e0b' }[user.role];
+  const isMobile = useIsMobile();
 
   const renderPage = () => {
     if (page === 'map') return <MapView pins={pins} setPins={setPins} currentUser={user} allUsers={allUsers} jobs={jobs} setJobs={setJobs} zones={zones} setZones={setZones} />;
@@ -1928,6 +1976,49 @@ export default function App() {
     if (page === 'payroll') return <PayrollView jobs={jobs} allUsers={allUsers} setAllUsers={setAllUsers} />;
     return null;
   };
+
+  if (isMobile) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#0a0a0f', color: '#f0f0f8', fontFamily: "'Inter', sans-serif", overflow: 'hidden' }}>
+        {/* Mobile top bar */}
+        <div style={{ background: '#111118', borderBottom: '1px solid #2a2a3a', padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, height: 52 }}>
+          <div style={{ fontWeight: 800, fontSize: 18 }}>Wash<span style={{ color: '#4f8ef7' }}>Ops</span></div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ fontSize: 12, color: roleColor, textTransform: 'capitalize', fontWeight: 600 }}>{user.name.split(' ')[0]}</div>
+            <Avatar name={user.name} role={user.role} size={28} />
+          </div>
+        </div>
+
+        {/* Page content */}
+        <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          {renderPage()}
+        </div>
+
+        {/* Mobile bottom nav */}
+        <div style={{ background: '#111118', borderTop: '1px solid #2a2a3a', display: 'flex', flexShrink: 0, paddingBottom: 'env(safe-area-inset-bottom)' }}>
+          {NAV[user.role].map(item => (
+            <button key={item.id} onClick={() => setPage(item.id)} style={{
+              flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              padding: '8px 4px', border: 'none', background: 'transparent', cursor: 'pointer',
+              color: page === item.id ? '#4f8ef7' : '#555570', transition: 'color 0.15s',
+              borderTop: page === item.id ? '2px solid #4f8ef7' : '2px solid transparent',
+            }}>
+              <span style={{ fontSize: 20, marginBottom: 2 }}>{item.icon}</span>
+              <span style={{ fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.3px' }}>{item.label}</span>
+            </button>
+          ))}
+          <button onClick={async () => { await supabase.auth.signOut(); setUser(null); setPage('map'); }} style={{
+            flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            padding: '8px 4px', border: 'none', background: 'transparent', cursor: 'pointer', color: '#555570',
+            borderTop: '2px solid transparent',
+          }}>
+            <span style={{ fontSize: 20, marginBottom: 2 }}>🚪</span>
+            <span style={{ fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.3px' }}>Out</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={s.app}>
