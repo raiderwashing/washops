@@ -377,37 +377,45 @@ function MapView({ pins, setPins, currentUser, allUsers, jobs, setJobs, zones, s
         }, null, { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 });
       }
 
-      // Click to drop pin — works for rep and admin clicking on behalf
+      // Single unified click handler — drawing mode + pin drop
       map.addListener('click', async (e) => {
+        if (window._drawingActive) {
+          const pt = { lat: e.latLng.lat(), lng: e.latLng.lng() };
+          drawingPointsRef.current = [...drawingPointsRef.current, pt];
+          setDrawingPoints(prev => [...prev, pt]);
+          const m = new window.google.maps.Marker({
+            position: pt, map,
+            icon: { path: window.google.maps.SymbolPath.CIRCLE, scale: 6, fillColor: '#4f8ef7', fillOpacity: 1, strokeColor: 'white', strokeWeight: 2 },
+            zIndex: 10,
+          });
+          tempMarkersRef.current.push(m);
+          if (tempPolylineRef.current) tempPolylineRef.current.setMap(null);
+          tempPolylineRef.current = new window.google.maps.Polyline({
+            path: [...drawingPointsRef.current, drawingPointsRef.current[0]],
+            strokeColor: '#4f8ef7', strokeWeight: 2, strokeOpacity: 0.8, map,
+          });
+          return;
+        }
         if (currentUser.role === 'tech') return;
-        if (window._drawingActive) return;
         const lat = e.latLng.lat();
         const lng = e.latLng.lng();
-
-        // Show temporary marker while geocoding
         const tempMarker = new window.google.maps.Marker({
-          position: { lat, lng },
-          map,
-          icon: {
-            path: window.google.maps.SymbolPath.CIRCLE,
-            scale: 12,
-            fillColor: '#f59e0b',
-            fillOpacity: 0.8,
-            strokeColor: 'white',
-            strokeWeight: 2,
-          },
-          title: 'Loading address...',
-          animation: window.google.maps.Animation.BOUNCE,
+          position: { lat, lng }, map,
+          icon: { path: window.google.maps.SymbolPath.CIRCLE, scale: 12, fillColor: '#f59e0b', fillOpacity: 0.8, strokeColor: 'white', strokeWeight: 2 },
+          title: 'Loading address...', animation: window.google.maps.Animation.BOUNCE,
         });
-
         const geocoder = new window.google.maps.Geocoder();
         geocoder.geocode({ location: { lat, lng } }, (results, status) => {
           tempMarker.setMap(null);
-          const address = status === 'OK' && results[0] 
-            ? results[0].formatted_address 
-            : `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+          const address = status === 'OK' && results[0] ? results[0].formatted_address : `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
           setModal({ lat, lng, address, rep_id: currentUser.id, rep_name: currentUser.name });
         });
+      });
+
+      map.addListener('dblclick', () => {
+        if (!window._drawingActive) return;
+        if (drawingPointsRef.current.length < 3) { alert('Click at least 3 points first'); return; }
+        if (finishDrawingRef.current) finishDrawingRef.current();
       });
       setMapReady(true);
     });
@@ -482,53 +490,7 @@ function MapView({ pins, setPins, currentUser, allUsers, jobs, setJobs, zones, s
     });
   }, [zones, mapReady]);
 
-  // Handle drawing mode clicks and double-click to close
-  useEffect(() => {
-    if (!googleMapRef.current || !mapReady) return;
 
-    const clickListener = googleMapRef.current.addListener('click', (e) => {
-      if (!window._drawingActive) return;
-      const pt = { lat: e.latLng.lat(), lng: e.latLng.lng() };
-      drawingPointsRef.current = [...drawingPointsRef.current, pt];
-      setDrawingPoints([...drawingPointsRef.current]);
-
-      // Small dot at each click point
-      const m = new window.google.maps.Marker({
-        position: pt,
-        map: googleMapRef.current,
-        icon: { path: window.google.maps.SymbolPath.CIRCLE, scale: 5, fillColor: '#4f8ef7', fillOpacity: 1, strokeColor: 'white', strokeWeight: 2 },
-        zIndex: 10,
-      });
-      tempMarkersRef.current.push(m);
-
-      // Update live polyline preview
-      if (tempPolylineRef.current) tempPolylineRef.current.setMap(null);
-      tempPolylineRef.current = new window.google.maps.Polyline({
-        path: [...drawingPointsRef.current, drawingPointsRef.current[0]], // close back to start
-        strokeColor: '#4f8ef7',
-        strokeWeight: 2,
-        strokeOpacity: 0.8,
-        strokeDashArray: '8 4',
-        map: googleMapRef.current,
-      });
-    });
-
-    // Double-click to auto-finish zone
-    const dblClickListener = googleMapRef.current.addListener('dblclick', (e) => {
-      if (!window._drawingActive) return;
-      if (drawingPointsRef.current.length < 3) {
-        alert('Click at least 3 points to create a zone');
-        return;
-      }
-      window.google.maps.event.removeListener(clickListener);
-      finishDrawingRef.current();
-    });
-
-    return () => {
-      window.google.maps.event.removeListener(clickListener);
-      window.google.maps.event.removeListener(dblClickListener);
-    };
-  }, [mapReady]);
 
   const startDrawing = () => {
     drawingPointsRef.current = [];
@@ -1173,8 +1135,8 @@ function RepDashboard({ pins, jobs, currentUser }) {
 
 // ─── Tech Dashboard ───────────────────────────────────────────────────────────
 function TechDashboard({ jobs, setJobs, currentUser }) {
-  const my = jobs.filter(j => j.tech_id === currentUser.id);
-  const pending = my.filter(j => ['scheduled'].includes(j.status));
+  const my = jobs.filter(j => String(j.tech_id) === String(currentUser.id));
+  const pending = my.filter(j => j.status === 'scheduled');
   const done = my.filter(j => ['serviced','complete','paid'].includes(j.status));
 
   const markServiced = async (job) => {
