@@ -49,13 +49,33 @@ const STATUS_CONFIG = {
 
 const PIN_COLORS = { 'not-interested': '#ef4444', 'not-home': '#e879f9', 'follow-up': '#f59e0b', appointment: '#10b981', closed: '#4f8ef7', paid: '#7c3aed' };
 
-const AGREEMENT = `WINDOW CLEANING SERVICE AGREEMENT — RAIDER WASHING
+const AGREEMENT_ONETIME = `ONE-TIME WINDOW CLEANING SERVICE AGREEMENT — RAIDER WASHING
 
-SERVICE PLAN: You are enrolling in window cleaning service as selected (One-Time or Quarterly Recurring).
+SERVICE: Raider Washing agrees to perform a one-time professional window cleaning service at the address provided. Our team will arrive at the scheduled date and time to complete the service.
 
-QUARTERLY PLAN: You will be charged monthly (1/3 of the quarterly rate) for a minimum of 12 months. Window cleaning will be performed every 3 months. You may cancel at any time — monthly payments already collected are non-refundable. If you are dissatisfied, contact Raider Washing and we will return for a complimentary re-service at no charge. After 12 months, you may cancel with no penalty.
+PAYMENT: Your card on file will be charged only after the service has been fully completed to your satisfaction. You will not be charged until the job is done.
 
-PAYMENT: Your card on file will be automatically charged after each service is completed.
+SATISFACTION GUARANTEE: If for any reason you are not satisfied with the quality of our work, contact Raider Washing and we will return to re-service your home at absolutely no additional charge.
+
+NO COMMITMENT: This is a one-time service with no recurring charges, subscriptions, or obligations of any kind.
+
+By agreeing, you authorize Raider Washing to perform the described service and charge your card on file upon completion.
+
+Contact: raiderwashing.com | Lubbock, TX`;
+
+const AGREEMENT_QUARTERLY = `QUARTERLY WINDOW CLEANING SERVICE AGREEMENT — RAIDER WASHING
+
+SERVICE PLAN: You are enrolling in Raider Washing's Quarterly Recurring Service. Our team will professionally clean your windows every 3 months at the address provided.
+
+BILLING: You will be billed monthly at 1/3 of the quarterly service rate. Your card on file will be charged each month automatically. You will not be charged until after each service is completed.
+
+12-MONTH COMMITMENT: This plan has a minimum term of 12 months. After 12 months, you may cancel at any time with no penalty or cancellation fee.
+
+EARLY CANCELLATION: You may cancel before 12 months at any time. Monthly payments already collected are non-refundable as they represent services rendered or scheduled.
+
+SATISFACTION GUARANTEE: If you are ever unsatisfied with a service, contact Raider Washing before canceling and we will return to re-service your home completely free of charge.
+
+By agreeing, you authorize Raider Washing to perform quarterly window cleaning services and charge your card on file monthly as described above.
 
 Contact: raiderwashing.com | Lubbock, TX`;
 
@@ -248,7 +268,7 @@ function DoorLogModal({ pin, onClose, onSave, onDelete, techs, allJobs }) {
                 </div>
               )}
             </div>
-            <div style={{ background: '#1a1a24', border: '1px solid #2a2a3a', borderRadius: 8, padding: 12, fontSize: 11, color: '#8888aa', lineHeight: 1.7, maxHeight: 90, overflowY: 'auto', marginBottom: 10 }}>{AGREEMENT}</div>
+            <div style={{ background: '#1a1a24', border: '1px solid #2a2a3a', borderRadius: 8, padding: 12, fontSize: 11, color: '#8888aa', lineHeight: 1.7, maxHeight: 90, overflowY: 'auto', marginBottom: 10 }}>{form.service === 'quarterly' ? AGREEMENT_QUARTERLY : AGREEMENT_ONETIME}</div>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 14 }}>
               <input type="checkbox" checked={form.agreed} onChange={e => set('agreed', e.target.checked)} style={{ marginTop: 2, accentColor: '#4f8ef7' }} />
               <span style={{ fontSize: 12, color: '#8888aa', lineHeight: 1.5 }}>Customer has read and agrees to the Raider Washing Service Agreement. Card on file will be charged after service completion.</span>
@@ -360,7 +380,7 @@ function MapView({ pins, setPins, currentUser, allUsers, jobs, setJobs, zones, s
       // Click to drop pin — works for rep and admin clicking on behalf
       map.addListener('click', async (e) => {
         if (currentUser.role === 'tech') return;
-        if (window._drawingActive) return; // block pin drops during zone drawing
+        if (window._drawingActive) return;
         const lat = e.latLng.lat();
         const lng = e.latLng.lng();
 
@@ -792,6 +812,11 @@ function ScheduleView({ jobs, setJobs, currentUser, allUsers }) {
       scheduled_time: job.scheduled_time || now.toTimeString().slice(0,5),
     }).eq('id', job.id).select().single();
     setJobs(js => js.map(j => j.id === job.id ? updated : j));
+    // Auto-close linked pin
+    if (job.address && job.rep_id) {
+      const { data: linkedPin } = await supabase.from('pins').select('id').eq('address', job.address).eq('rep_id', job.rep_id).maybeSingle();
+      if (linkedPin) await supabase.from('pins').update({ status: 'closed' }).eq('id', linkedPin.id);
+    }
     setSelected(null);
   };
 
@@ -1047,7 +1072,7 @@ function AdminDashboard({ pins, jobs, allUsers }) {
   const serviced = jobs.filter(j => j.status === 'serviced').length;
   const conv = pins.length ? Math.round(pins.filter(p => ['closed','paid','appointment'].includes(p.status)).length / pins.length * 100) : 0;
   const knockers = [...reps, ...allUsers.filter(u => u.role === 'admin')];
-  const repStats = knockers.map(r => ({ ...r, knocked: pins.filter(p => p.rep_id === r.id).length, closed: pins.filter(p => p.rep_id === r.id && ['closed','paid'].includes(p.status)).length, rev: jobs.filter(j => j.rep_id === r.id && ['complete','paid'].includes(j.status)).reduce((s, j) => s + (j.price || 0), 0) })).filter(r => r.knocked > 0 || r.role === 'rep');
+  const repStats = knockers.map(r => ({ ...r, knocked: pins.filter(p => String(p.rep_id) === String(r.id)).length, closed: pins.filter(p => String(p.rep_id) === String(r.id) && ['closed','paid'].includes(p.status)).length, rev: jobs.filter(j => String(j.rep_id) === String(r.id) && ['complete','paid'].includes(j.status)).reduce((s, j) => s + (j.price || 0), 0) }));
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -1149,7 +1174,7 @@ function RepDashboard({ pins, jobs, currentUser }) {
 // ─── Tech Dashboard ───────────────────────────────────────────────────────────
 function TechDashboard({ jobs, setJobs, currentUser }) {
   const my = jobs.filter(j => j.tech_id === currentUser.id);
-  const pending = my.filter(j => j.status === 'scheduled');
+  const pending = my.filter(j => ['scheduled'].includes(j.status));
   const done = my.filter(j => ['serviced','complete','paid'].includes(j.status));
 
   const markServiced = async (job) => {
@@ -1159,6 +1184,14 @@ function TechDashboard({ jobs, setJobs, currentUser }) {
       completed_date: now.toISOString().split('T')[0],
     }).eq('id', job.id).select().single();
     setJobs(js => js.map(j => j.id === job.id ? updated : j));
+    // Auto-update linked pin from appointment to closed
+    if (job.address && job.rep_id) {
+      const { data: linkedPin } = await supabase.from('pins')
+        .select('id').eq('address', job.address).eq('rep_id', job.rep_id).maybeSingle();
+      if (linkedPin) {
+        await supabase.from('pins').update({ status: 'closed' }).eq('id', linkedPin.id);
+      }
+    }
   };
 
   return (
