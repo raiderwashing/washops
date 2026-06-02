@@ -1097,7 +1097,7 @@ function AdminDashboard({ pins, jobs, allUsers, onRefresh }) {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}><Avatar name={t.name} role="tech" size={28} /><div><div style={{ fontSize: 13, fontWeight: 500 }}>{t.name}</div><div style={{ fontSize: 11, color: '#8888aa' }}>Technician</div></div></div>
                   <div style={{ display: 'flex', gap: 14 }}>
                     <div style={{ fontSize: 12 }}><span style={{ color: '#f59e0b' }}>{tj.filter(j => j.status === 'scheduled').length}</span> pending</div>
-                    <div style={{ fontSize: 12 }}><span style={{ color: '#10b981' }}>{tj.filter(j => j.status === 'paid').length}</span> done</div>
+                    <div style={{ fontSize: 12 }}><span style={{ color: '#10b981' }}>{tj.filter(j => ['serviced','complete','paid'].includes(j.status)).length}</span> done</div>
                   </div>
                 </div>
               );
