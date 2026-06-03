@@ -1924,6 +1924,8 @@ export default function App() {
     });
   }, []);
 
+  const isMobile = useIsMobile();
+
   if (loading) return <Spinner />;
   if (!user) return <AuthScreen onLogin={u => { setUser(u); setPage(u.role === 'tech' ? 'jobs' : u.role === 'admin' ? 'dashboard' : 'map'); }} />;
 
@@ -1934,7 +1936,6 @@ export default function App() {
   };
 
   const roleColor = { admin: '#4f8ef7', rep: '#10b981', tech: '#f59e0b' }[user.role];
-  const isMobile = useIsMobile();
 
   const renderPage = () => {
     if (page === 'map') return <MapView pins={pins} setPins={setPins} currentUser={user} allUsers={allUsers} jobs={jobs} setJobs={setJobs} zones={zones} setZones={setZones} />;
