@@ -1863,6 +1863,7 @@ function PayrollView({ jobs, allUsers, setAllUsers }) {
 
 // ─── Main App ─────────────────────────────────────────────────────────────────
 export default function App() {
+  const isMobile = useIsMobile();
   const [user, setUser] = useState(null);
   const [page, setPage] = useState('map');
   const [pins, setPins] = useState([]);
@@ -1923,8 +1924,6 @@ export default function App() {
       setLoading(false);
     });
   }, []);
-
-  const isMobile = useIsMobile();
 
   if (loading) return <Spinner />;
   if (!user) return <AuthScreen onLogin={u => { setUser(u); setPage(u.role === 'tech' ? 'jobs' : u.role === 'admin' ? 'dashboard' : 'map'); }} />;
