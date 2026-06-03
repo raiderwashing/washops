@@ -14,7 +14,7 @@ const s = {
   main: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
   topbar: { background: '#111118', borderBottom: '1px solid #2a2a3a', padding: '0 20px', height: 52, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 },
   topbarTitle: { fontWeight: 700, fontSize: 15 },
-  page: { flex: 1, overflowY: 'auto', padding: 20 }, // use inline padding for mobile
+  page: { flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: 20, WebkitOverflowScrolling: 'touch' },
   card: (extra = {}) => ({ background: '#111118', border: '1px solid #2a2a3a', borderRadius: 12, padding: 18, ...extra }),
   statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }, // desktop only - use inline for mobile
   twoCol: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 },
@@ -1962,9 +1962,9 @@ export default function App() {
 
   if (isMobile) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#0a0a0f', color: '#f0f0f8', fontFamily: "'Inter', sans-serif", overflow: 'hidden' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', maxHeight: '-webkit-fill-available', background: '#0a0a0f', color: '#f0f0f8', fontFamily: "'Inter', sans-serif", overflow: 'hidden', position: 'fixed', inset: 0 }}>
         {/* Mobile top bar */}
-        <div style={{ background: '#111118', borderBottom: '1px solid #2a2a3a', padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, height: 52 }}>
+        <div style={{ background: '#111118', borderBottom: '1px solid #2a2a3a', padding: '10px 16px', paddingTop: 'max(10px, env(safe-area-inset-top))', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
           <div style={{ fontWeight: 800, fontSize: 18 }}>Wash<span style={{ color: '#4f8ef7' }}>Ops</span></div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{ fontSize: 12, color: roleColor, textTransform: 'capitalize', fontWeight: 600 }}>{user.name.split(' ')[0]}</div>
@@ -1978,7 +1978,7 @@ export default function App() {
         </div>
 
         {/* Mobile bottom nav */}
-        <div style={{ background: '#111118', borderTop: '1px solid #2a2a3a', display: 'flex', flexShrink: 0, paddingBottom: 'env(safe-area-inset-bottom)' }}>
+        <div style={{ background: '#111118', borderTop: '1px solid #2a2a3a', display: 'flex', flexShrink: 0, paddingBottom: 'max(env(safe-area-inset-bottom), 8px)' }}>
           {NAV[user.role].map(item => (
             <button key={item.id} onClick={() => setPage(item.id)} style={{
               flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
@@ -2004,7 +2004,7 @@ export default function App() {
   }
 
   return (
-    <div style={s.app}>
+    <div style={{ ...s.app, position: 'fixed', inset: 0 }}>
       <div style={s.sidebar}>
         <div style={s.sidebarLogo}>Wash<span style={{ color: '#4f8ef7' }}>Ops</span></div>
         <div style={s.sidebarUser}>
