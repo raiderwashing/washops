@@ -15,7 +15,7 @@ const s = {
   topbar: { background: '#ffffff', borderBottom: '1px solid #2a2a3a', padding: '0 20px', height: 52, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 },
   topbarTitle: { fontWeight: 700, fontSize: 15 },
   page: { flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: 20, WebkitOverflowScrolling: 'touch', background: '#f5f7fa' },
-  card: (extra = {}) => ({ background: '#ffffff', border: '1px solid #2a2a3a', borderRadius: 12, padding: 18, ...extra }),
+  card: (extra = {}) => ({ background: '#ffffff', border: '1px solid #2a2a3a', borderRadius: 8, padding: 18, ...extra }),
   statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }, // desktop only - use inline for mobile
   twoCol: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 },
   input: { width: '100%', background: '#f8f9fb', border: '1px solid #2a2a3a', borderRadius: 8, padding: '10px 12px', color: '#1a1a2e', fontSize: 13, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' },
@@ -25,9 +25,9 @@ const s = {
   btnGhost: { padding: '8px 14px', background: '#f8f9fb', border: '1px solid #2a2a3a', borderRadius: 8, color: '#6b7280', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 },
   btnAccent: { padding: '8px 14px', background: '#378add', border: 'none', borderRadius: 8, color: 'white', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 },
   btnGreen: { padding: '8px 14px', background: '#10b981', border: 'none', borderRadius: 8, color: 'white', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 },
-  modal: { background: '#ffffff', border: '1px solid #2a2a3a', borderRadius: 16, padding: 24, width: 460, maxHeight: '85vh', overflowY: 'auto' },
+  modal: { background: '#ffffff', border: '1px solid #2a2a3a', borderRadius: 10, padding: 24, width: 460, maxHeight: '85vh', overflowY: 'auto' },
   backdrop: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  badge: (status) => { const c = STATUS_CONFIG[status] || { color: '#6b7280', bg: 'rgba(107,114,128,0.12)' }; return { background: c.bg, color: c.color, padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 600 }; },
+  badge: (status) => { const c = STATUS_CONFIG[status] || { color: '#6b7280', bg: 'rgba(107,114,128,0.12)' }; return { background: c.bg, color: c.color, padding: '3px 9px', borderRadius: 8, fontSize: 11, fontWeight: 600 }; },
   table: { width: '100%', borderCollapse: 'collapse' },
   th: { padding: '9px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '1px solid #2a2a3a', background: '#f8f9fb' },
   td: { padding: '11px 16px', fontSize: 13, borderBottom: '1px solid #f0f2f5' },
@@ -138,7 +138,7 @@ function AuthScreen({ onLogin }) {
 
   return (
     <div style={{ height: '100vh', background: '#f5f7fa', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ background: '#ffffff', border: '1px solid #2a2a3a', borderRadius: 20, padding: 44, width: 400, boxShadow: '0 24px 80px rgba(0,0,0,0.6)' }}>
+      <div style={{ background: '#ffffff', border: '1px solid #2a2a3a', borderRadius: 8, padding: 44, width: 400, boxShadow: '0 24px 80px rgba(0,0,0,0.6)' }}>
         <div style={{ fontWeight: 800, fontSize: 28, marginBottom: 4 }}>Wash<span style={{ color: '#378add' }}>Ops</span></div>
         <div style={{ color: '#6b7280', fontSize: 13, marginBottom: 32 }}>Field Sales & Job Management · Raider Washing</div>
         <div style={{ marginBottom: 14 }}>
@@ -663,7 +663,7 @@ function MapView({ pins, setPins, currentUser, allUsers, jobs, setJobs, zones, s
               {STATUS_CONFIG[k]?.label}
             </span>
           ))}
-          <span style={{ fontSize: 11, color: '#378add', background: 'rgba(55,138,221,0.08)', border: '1px solid rgba(55,138,221,0.2)', borderRadius: 20, padding: '3px 10px' }}>{visiblePins.length} pins</span>
+          <span style={{ fontSize: 11, color: '#378add', background: 'rgba(55,138,221,0.08)', border: '1px solid rgba(55,138,221,0.2)', borderRadius: 8, padding: '3px 10px' }}>{visiblePins.length} pins</span>
         </div>
       </div>
       <div style={{ flex: 1, position: 'relative' }}>
@@ -985,7 +985,7 @@ function ScheduleView({ jobs, setJobs, currentUser, allUsers }) {
         {view === 'month' && <MonthView />}
         {view === 'week' && <WeekView />}
         {view === 'day' && <DayView />}
-        <div style={{ background: '#ffffff', border: '1px solid #2a2a3a', borderRadius: 12, overflow: 'hidden' }}>
+        <div style={{ background: '#ffffff', border: '1px solid #2a2a3a', borderRadius: 8, overflow: 'hidden' }}>
           <div style={{ padding: '14px 16px', borderBottom: '1px solid #e2e4e8', fontWeight: 700, fontSize: 14, color: '#1a1a2e' }}>All Jobs</div>
           <table style={s.table}>
             <thead><tr><th style={s.th}>Customer</th><th style={s.th}>Service</th><th style={s.th}>Date · Time</th><th style={s.th}>Status</th><th style={s.th}>Price</th></tr></thead>
@@ -1174,12 +1174,11 @@ function RevenueChart({ jobs }) {
               {/* Grid lines */}
               {[0, 0.25, 0.5, 0.75, 1].map((p, i) => (
                 <g key={i}>
-                  <line x1="0" y1={chartH - p * chartH} x2={chartW} y2={chartH - p * chartH} stroke="#2a2a3a" strokeWidth="0.5" />
-                  <text x="-1" y={chartH - p * chartH + 1} fontSize="4" fill="#555570" textAnchor="end">${Math.round(maxVal * p)}</text>
+                  <line x1="0" y1={chartH - p * chartH} x2={chartW} y2={chartH - p * chartH} stroke="#e8ecf0" strokeWidth="0.5" />
+                  <text x="-1" y={chartH - p * chartH + 1} fontSize="4" fill="#9ca3af" textAnchor="end">${Math.round(maxVal * p)}</text>
                 </g>
               ))}
 
-              {/* Build area paths */}
               {(() => {
                 const toPath = (pts, close = false) => {
                   const arr = pts.split(' ');
@@ -1190,15 +1189,25 @@ function RevenueChart({ jobs }) {
                 };
                 return (
                   <>
-                    {/* Collected area fill - yellow, bottom */}
-                    <path d={toPath(pts_collected, true)} fill="#f59e0b" fillOpacity="0.1" />
-                    {/* Collected solid line - yellow */}
-                    <path d={toPath(pts_collected)} fill="none" stroke="#f59e0b" strokeWidth="1.5" />
+                    <defs>
+                      <linearGradient id="gradCollected" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#378add" stopOpacity="0.25"/>
+                        <stop offset="100%" stopColor="#378add" stopOpacity="0"/>
+                      </linearGradient>
+                      <linearGradient id="gradPending" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#10b981" stopOpacity="0.2"/>
+                        <stop offset="100%" stopColor="#10b981" stopOpacity="0"/>
+                      </linearGradient>
+                    </defs>
+                    {/* Collected gradient area */}
+                    <path d={toPath(pts_collected, true)} fill="url(#gradCollected)" />
+                    {/* Collected solid line */}
+                    <path d={toPath(pts_collected)} fill="none" stroke="#378add" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
 
-                    {/* Pending area fill - green, top */}
-                    <path d={toPath(pts_pending, true)} fill="#10b981" fillOpacity="0.1" />
-                    {/* Pending solid line - green */}
-                    <path d={toPath(pts_pending)} fill="none" stroke="#10b981" strokeWidth="1.5" />
+                    {/* Pending gradient area */}
+                    <path d={toPath(pts_pending, true)} fill="url(#gradPending)" />
+                    {/* Pending solid line */}
+                    <path d={toPath(pts_pending)} fill="none" stroke="#10b981" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
                   </>
                 );
               })()}
@@ -1209,12 +1218,12 @@ function RevenueChart({ jobs }) {
                 const yC = chartH - (d.collected / maxVal) * chartH;
                 return (
                   <g key={i}>
-                    <circle cx={x} cy={yC} r="2" fill="#f59e0b" />
+                    <circle cx={x} cy={yC} r="3" fill="#378add" stroke="white" strokeWidth="1.5" />
                     <rect x={x - 4} y={0} width="8" height={chartH} fill="transparent"
                       onMouseEnter={() => setHovered(i)}
                       onMouseLeave={() => setHovered(null)}
                     />
-                    {hovered === i && <line x1={x} y1={0} x2={x} y2={chartH} stroke="#4f8ef7" strokeWidth="0.5" strokeOpacity="0.5" />}
+                    {hovered === i && <line x1={x} y1={0} x2={x} y2={chartH} stroke="#378add" strokeWidth="1" strokeOpacity="0.4" strokeDasharray="3 2" />}
                   </g>
                 );
               })}
@@ -1269,7 +1278,6 @@ function AdminDashboard({ pins, jobs, allUsers, onRefresh }) {
             <div key={i} style={s.card()}><div style={{ fontSize: isMobile ? 10 : 11, color: '#6b7280', marginBottom: 4 }}>{st.l}</div><div style={{ fontWeight: 800, fontSize: isMobile ? 20 : 24, color: st.c }}>{st.v}</div></div>
           ))}
         </div>
-        {/* Revenue Chart */}
         <RevenueChart jobs={jobs} />
 
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12, marginBottom: 16 }}>
@@ -1315,7 +1323,7 @@ function AdminDashboard({ pins, jobs, allUsers, onRefresh }) {
             })}
           </div>
         </div>
-        <div style={{ background: '#ffffff', border: '1px solid #2a2a3a', borderRadius: 12, overflow: 'hidden' }}>
+        <div style={{ background: '#ffffff', border: '1px solid #2a2a3a', borderRadius: 8, overflow: 'hidden' }}>
           <div style={{ padding: '14px 16px', borderBottom: '1px solid #e2e4e8', fontWeight: 700, fontSize: 14, color: '#1a1a2e' }}>Recent Jobs</div>
           <table style={s.table}>
             <thead><tr><th style={s.th}>Customer</th><th style={s.th}>Service</th><th style={s.th}>Rep</th><th style={s.th}>Tech</th><th style={s.th}>Status</th><th style={s.th}>Amount</th></tr></thead>
@@ -1350,7 +1358,7 @@ function RepDashboard({ pins, jobs, currentUser }) {
             </div>
           ))}
         </div>
-        <div style={{ background: '#ffffff', border: '1px solid #2a2a3a', borderRadius: 12, overflow: 'hidden' }}>
+        <div style={{ background: '#ffffff', border: '1px solid #2a2a3a', borderRadius: 8, overflow: 'hidden' }}>
           <div style={{ padding: '14px 16px', borderBottom: '1px solid #e2e4e8', fontWeight: 700, fontSize: 14, color: '#1a1a2e' }}>My Pins</div>
           <table style={s.table}>
             <thead><tr><th style={s.th}>Address</th><th style={s.th}>Name</th><th style={s.th}>Status</th><th style={s.th}>Service</th></tr></thead>
@@ -1420,7 +1428,7 @@ function CustomersView({ pins, jobs }) {
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <div style={s.topbar}><div style={s.topbarTitle}>👥 Customers</div><span style={{ fontSize: 12, color: '#6b7280' }}>{customers.length} active</span></div>
       <div style={s.page}>
-        <div style={{ background: '#ffffff', border: '1px solid #2a2a3a', borderRadius: 12, overflow: 'hidden' }}>
+        <div style={{ background: '#ffffff', border: '1px solid #2a2a3a', borderRadius: 8, overflow: 'hidden' }}>
           <table style={s.table}>
             <thead><tr><th style={s.th}>Name</th><th style={s.th}>Address</th><th style={s.th}>Plan</th><th style={s.th}>Price</th><th style={s.th}>Status</th><th style={s.th}>Card on File</th><th style={s.th}>Notes</th></tr></thead>
             <tbody>{customers.map(c => { const job = jobs.find(j => j.address === c.address); return <tr key={c.id}><td style={{ ...s.td, fontWeight: 500 }}>{c.name || 'Unknown'}</td><td style={{ ...s.td, fontSize: 12, color: '#6b7280' }}>{c.address}</td><td style={{ ...s.td, fontSize: 12, textTransform: 'capitalize' }}>{c.service || '—'}</td><td style={{ ...s.td, fontWeight: 700 }}>{c.price ? `$${c.price}` : '—'}</td><td style={s.td}><Badge status={c.status} /></td><td style={{ ...s.td, fontSize: 12, color: job?.card_on_file ? '#10b981' : '#9ca3af' }}>{job?.card_on_file ? '✅ On file' : '—'}</td><td style={{ ...s.td, fontSize: 12, color: '#6b7280', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.notes}</td></tr>; })}</tbody>
@@ -1540,7 +1548,7 @@ function TeamView({ allUsers, setAllUsers }) {
         </div>
 
         {/* Team Table */}
-        <div style={{ background: '#ffffff', border: '1px solid #2a2a3a', borderRadius: 12, overflow: 'hidden' }}>
+        <div style={{ background: '#ffffff', border: '1px solid #2a2a3a', borderRadius: 8, overflow: 'hidden' }}>
           <table style={s.table}>
             <thead>
               <tr>
@@ -1563,7 +1571,7 @@ function TeamView({ allUsers, setAllUsers }) {
                     </div>
                   </td>
                   <td style={s.td}>
-                    <span style={{ background: `${roleColor[user.role]}22`, color: roleColor[user.role], padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, textTransform: 'capitalize' }}>{user.role}</span>
+                    <span style={{ background: `${roleColor[user.role]}22`, color: roleColor[user.role], padding: '3px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, textTransform: 'capitalize' }}>{user.role}</span>
                   </td>
                   <td style={{ ...s.td, fontSize: 12, color: '#6b7280' }}>{user.email}</td>
                   <td style={{ ...s.td, fontSize: 12, color: '#6b7280' }}>{user.phone || '—'}</td>
@@ -1578,7 +1586,7 @@ function TeamView({ allUsers, setAllUsers }) {
                     </div>
                   </td>
                   <td style={s.td}>
-                    <span style={{ background: user.active !== false ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)', color: user.active !== false ? '#10b981' : '#ef4444', padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600 }}>
+                    <span style={{ background: user.active !== false ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)', color: user.active !== false ? '#10b981' : '#ef4444', padding: '3px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600 }}>
                       {user.active !== false ? 'Active' : 'Inactive'}
                     </span>
                   </td>
@@ -1730,7 +1738,7 @@ function PayrollView({ jobs, allUsers, setAllUsers }) {
         </div>
 
         {/* Per person breakdown */}
-        <div style={{ background: '#ffffff', border: '1px solid #2a2a3a', borderRadius: 12, overflow: 'hidden', marginBottom: 24 }}>
+        <div style={{ background: '#ffffff', border: '1px solid #2a2a3a', borderRadius: 8, overflow: 'hidden', marginBottom: 24 }}>
           <div style={{ padding: '14px 16px', borderBottom: '1px solid #e2e4e8', fontWeight: 700, fontSize: 14, color: '#1a1a2e' }}>Team Earnings</div>
           <table style={s.table}>
             <thead>
