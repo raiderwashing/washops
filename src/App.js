@@ -1169,15 +1169,19 @@ function RevenueChart({ jobs }) {
             )}
           </div>
 
-          <div style={{ position: 'relative', height: chartH + 40, width: '100%' }}>
-            <svg viewBox={`-2 -10 ${chartW + 4} ${chartH + 30}`} preserveAspectRatio="none" style={{ width: '100%', height: chartH + 10, overflow: 'visible' }} xmlns="http://www.w3.org/2000/svg">
-              {/* Grid lines */}
-              {[0, 0.25, 0.5, 0.75, 1].map((p, i) => (
-                <g key={i}>
-                  <line x1="0" y1={chartH - p * chartH} x2={chartW} y2={chartH - p * chartH} stroke="#e8ecf0" strokeWidth="0.5" vectorEffect="non-scaling-stroke" />
-                  <text x="-1" y={chartH - p * chartH + 1} fontSize="4" fill="#9ca3af" textAnchor="end">${Math.round(maxVal * p)}</text>
-                </g>
-              ))}
+          <div style={{ position: 'relative', height: chartH + 40, width: '100%', paddingLeft: 36 }}>
+            <svg viewBox={`-8 -10 ${chartW + 10} ${chartH + 30}`} preserveAspectRatio="none" style={{ width: '100%', height: chartH + 10, overflow: 'visible' }} xmlns="http://www.w3.org/2000/svg">
+              {/* Grid lines + Y axis labels */}
+              {[0, 0.25, 0.5, 0.75, 1].map((p, i) => {
+                const val = Math.round(maxVal * p);
+                const label = val >= 1000 ? `$${(val/1000).toFixed(1)}k` : `$${val}`;
+                return (
+                  <g key={i}>
+                    <line x1="0" y1={chartH - p * chartH} x2={chartW} y2={chartH - p * chartH} stroke="#e8ecf0" strokeWidth="0.5" vectorEffect="non-scaling-stroke" />
+                    <text x="-2" y={chartH - p * chartH + 1.5} fontSize="5" fill="#9ca3af" textAnchor="end" fontFamily="Inter, sans-serif">{label}</text>
+                  </g>
+                );
+              })}
 
               {(() => {
                 const toPath = (pts, close = false) => {
