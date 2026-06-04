@@ -157,6 +157,107 @@ function AuthScreen({ onLogin }) {
 }
 
 // ─── Door Log Modal ───────────────────────────────────────────────────────────
+// ─── Signature Pad ───────────────────────────────────────────────────────────
+function SignaturePad({ onSign, signature }) {
+  const canvasRef = React.useRef(null);
+  const drawing = React.useRef(false);
+  const [hasSignature, setHasSignature] = React.useState(!!signature);
+
+  React.useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    canvas.width = canvas.offsetWidth * window.devicePixelRatio;
+    canvas.height = canvas.offsetHeight * window.devicePixelRatio;
+    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    ctx.strokeStyle = '#1a1a2e';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    // If existing signature, draw it
+    if (signature) {
+      const img = new Image();
+      img.onload = () => ctx.drawImage(img, 0, 0, canvas.offsetWidth, canvas.offsetHeight);
+      img.src = signature;
+    }
+  }, []);
+
+  const getPos = (e, canvas) => {
+    const rect = canvas.getBoundingClientRect();
+    const touch = e.touches ? e.touches[0] : e;
+    return { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
+  };
+
+  const startDraw = (e) => {
+    e.preventDefault();
+    drawing.current = true;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    const pos = getPos(e, canvas);
+    ctx.beginPath();
+    ctx.moveTo(pos.x, pos.y);
+  };
+
+  const draw = (e) => {
+    e.preventDefault();
+    if (!drawing.current) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    const pos = getPos(e, canvas);
+    ctx.lineTo(pos.x, pos.y);
+    ctx.stroke();
+  };
+
+  const endDraw = (e) => {
+    e.preventDefault();
+    if (!drawing.current) return;
+    drawing.current = false;
+    const canvas = canvasRef.current;
+    setHasSignature(true);
+    onSign(canvas.toDataURL('image/png'));
+  };
+
+  const clear = () => {
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    setHasSignature(false);
+    onSign(null);
+  };
+
+  return (
+    <div>
+      <div style={{ position: 'relative', background: '#ffffff', border: `2px solid ${hasSignature ? '#10b981' : '#e2e4e8'}`, borderRadius: 8, overflow: 'hidden', transition: 'border-color 0.2s' }}>
+        <canvas
+          ref={canvasRef}
+          style={{ width: '100%', height: 120, display: 'block', touchAction: 'none', cursor: 'crosshair' }}
+          onMouseDown={startDraw}
+          onMouseMove={draw}
+          onMouseUp={endDraw}
+          onMouseLeave={endDraw}
+          onTouchStart={startDraw}
+          onTouchMove={draw}
+          onTouchEnd={endDraw}
+        />
+        {!hasSignature && (
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+            <span style={{ fontSize: 12, color: '#9ca3af', fontStyle: 'italic' }}>Customer signs here with finger</span>
+          </div>
+        )}
+        <div style={{ position: 'absolute', bottom: 6, left: 0, right: 0, borderTop: '1px solid #e2e4e8', margin: '0 12px', pointerEvents: 'none' }} />
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
+        <span style={{ fontSize: 11, color: hasSignature ? '#10b981' : '#9ca3af', fontWeight: 600 }}>
+          {hasSignature ? '✅ Signed' : 'Not signed yet'}
+        </span>
+        {hasSignature && (
+          <button onClick={clear} style={{ fontSize: 11, color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Clear & Redo</button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function DoorLogModal({ pin, onClose, onSave, onDelete, techs, allJobs }) {
   const [form, setForm] = useState({
     address: pin?.address || '',
@@ -169,6 +270,7 @@ function DoorLogModal({ pin, onClose, onSave, onDelete, techs, allJobs }) {
     scheduled_time: pin?.scheduled_time || new Date().toTimeString().slice(0,5),
     tech_id: pin?.tech_id || '',
     agreed: false,
+    signature: pin?.signature || null,
   });
   const [showTechPicker, setShowTechPicker] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -292,10 +394,10 @@ function DoorLogModal({ pin, onClose, onSave, onDelete, techs, allJobs }) {
                 </div>
               )}
             </div>
-            <div style={{ background: '#f8f9fb', border: '1px solid #2a2a3a', borderRadius: 8, padding: 12, fontSize: 11, color: '#6b7280', lineHeight: 1.7, maxHeight: 90, overflowY: 'auto', marginBottom: 10 }}>{form.service === 'quarterly' ? AGREEMENT_QUARTERLY : AGREEMENT_ONETIME}</div>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 14 }}>
-              <input type="checkbox" checked={form.agreed} onChange={e => set('agreed', e.target.checked)} style={{ marginTop: 2, accentColor: '#378add' }} />
-              <span style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>Customer has read and agrees to the Raider Washing Service Agreement. Card on file will be charged after service completion.</span>
+            <div style={{ background: '#f8f9fb', border: '1px solid #e2e4e8', borderRadius: 8, padding: 12, fontSize: 11, color: '#6b7280', lineHeight: 1.7, maxHeight: 90, overflowY: 'auto', marginBottom: 12 }}>{form.service === 'quarterly' ? AGREEMENT_QUARTERLY : AGREEMENT_ONETIME}</div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={s.label}>Customer Signature</label>
+              <SignaturePad onSign={(sig) => set('signature', sig)} signature={form.signature} />
             </div>
           </>
         )}
