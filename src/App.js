@@ -1170,11 +1170,11 @@ function RevenueChart({ jobs }) {
           </div>
 
           <div style={{ position: 'relative', height: chartH + 40, width: '100%' }}>
-            <svg viewBox={`-2 -10 ${chartW + 4} ${chartH + 30}`} preserveAspectRatio="none" style={{ width: '100%', height: chartH + 10, overflow: 'visible' }}>
+            <svg viewBox={`-2 -10 ${chartW + 4} ${chartH + 30}`} preserveAspectRatio="none" style={{ width: '100%', height: chartH + 10, overflow: 'visible' }} xmlns="http://www.w3.org/2000/svg">
               {/* Grid lines */}
               {[0, 0.25, 0.5, 0.75, 1].map((p, i) => (
                 <g key={i}>
-                  <line x1="0" y1={chartH - p * chartH} x2={chartW} y2={chartH - p * chartH} stroke="#e8ecf0" strokeWidth="0.5" />
+                  <line x1="0" y1={chartH - p * chartH} x2={chartW} y2={chartH - p * chartH} stroke="#e8ecf0" strokeWidth="0.5" vectorEffect="non-scaling-stroke" />
                   <text x="-1" y={chartH - p * chartH + 1} fontSize="4" fill="#9ca3af" textAnchor="end">${Math.round(maxVal * p)}</text>
                 </g>
               ))}
@@ -1213,12 +1213,12 @@ function RevenueChart({ jobs }) {
                     {/* Collected gradient area - smooth */}
                     <path d={toSmoothPath(pts_collected) + ` L ${chartW},${chartH} L 0,${chartH} Z`} fill="url(#gradCollected)" />
                     {/* Collected solid line - smooth */}
-                    <path d={toSmoothPath(pts_collected)} fill="none" stroke="#378add" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+                    <path d={toSmoothPath(pts_collected)} fill="none" stroke="#378add" strokeWidth="1" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
 
                     {/* Pending gradient area - smooth */}
                     <path d={toSmoothPath(pts_pending) + ` L ${chartW},${chartH} L 0,${chartH} Z`} fill="url(#gradPending)" />
                     {/* Pending solid line - smooth */}
-                    <path d={toSmoothPath(pts_pending)} fill="none" stroke="#10b981" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+                    <path d={toSmoothPath(pts_pending)} fill="none" stroke="#10b981" strokeWidth="1" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
                   </>
                 );
               })()}
