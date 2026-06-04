@@ -1131,7 +1131,7 @@ function RevenueChart({ jobs }) {
 
   const data = buildData();
   const maxVal = Math.max(...data.map(d => d.collected + d.pending), 1);
-  const chartH = 160;
+  const chartH = 200;
   const chartW = 100;
   const pts_collected = data.map((d, i) => `${(i / (data.length - 1)) * chartW},${chartH - (d.collected / maxVal) * chartH}`).join(' ');
   const pts_pending = data.map((d, i) => `${(i / (data.length - 1)) * chartW},${chartH - ((d.collected + d.pending) / maxVal) * chartH}`).join(' ');
@@ -1169,7 +1169,7 @@ function RevenueChart({ jobs }) {
             )}
           </div>
 
-          <div style={{ position: 'relative', height: chartH + 30, width: '100%' }}>
+          <div style={{ position: 'relative', height: chartH + 40, width: '100%' }}>
             <svg viewBox={`-2 -10 ${chartW + 4} ${chartH + 30}`} preserveAspectRatio="none" style={{ width: '100%', height: chartH + 10, overflow: 'visible' }}>
               {/* Grid lines */}
               {[0, 0.25, 0.5, 0.75, 1].map((p, i) => (
@@ -1187,6 +1187,17 @@ function RevenueChart({ jobs }) {
                   if (close) d += ` L ${chartW},${chartH} L 0,${chartH} Z`;
                   return d;
                 };
+                const toSmoothPath = (pts) => {
+                  const arr = pts.split(' ').map(p => p.split(',').map(Number));
+                  if (arr.length < 2) return `M ${pts}`;
+                  let d = `M ${arr[0][0]},${arr[0][1]}`;
+                  for (let i = 1; i < arr.length; i++) {
+                    const prev = arr[i-1], curr = arr[i];
+                    const cpx = (prev[0] + curr[0]) / 2;
+                    d += ` C ${cpx},${prev[1]} ${cpx},${curr[1]} ${curr[0]},${curr[1]}`;
+                  }
+                  return d;
+                };
                 return (
                   <>
                     <defs>
@@ -1199,31 +1210,29 @@ function RevenueChart({ jobs }) {
                         <stop offset="100%" stopColor="#10b981" stopOpacity="0"/>
                       </linearGradient>
                     </defs>
-                    {/* Collected gradient area */}
-                    <path d={toPath(pts_collected, true)} fill="url(#gradCollected)" />
-                    {/* Collected solid line */}
-                    <path d={toPath(pts_collected)} fill="none" stroke="#378add" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+                    {/* Collected gradient area - smooth */}
+                    <path d={toSmoothPath(pts_collected) + ` L ${chartW},${chartH} L 0,${chartH} Z`} fill="url(#gradCollected)" />
+                    {/* Collected solid line - smooth */}
+                    <path d={toSmoothPath(pts_collected)} fill="none" stroke="#378add" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
 
-                    {/* Pending gradient area */}
-                    <path d={toPath(pts_pending, true)} fill="url(#gradPending)" />
-                    {/* Pending solid line */}
-                    <path d={toPath(pts_pending)} fill="none" stroke="#10b981" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+                    {/* Pending gradient area - smooth */}
+                    <path d={toSmoothPath(pts_pending) + ` L ${chartW},${chartH} L 0,${chartH} Z`} fill="url(#gradPending)" />
+                    {/* Pending solid line - smooth */}
+                    <path d={toSmoothPath(pts_pending)} fill="none" stroke="#10b981" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
                   </>
                 );
               })()}
 
-              {/* Dots + hover */}
+              {/* Hover zones - no dots */}
               {data.map((d, i) => {
                 const x = (i / (data.length - 1)) * chartW;
-                const yC = chartH - (d.collected / maxVal) * chartH;
                 return (
                   <g key={i}>
-                    <circle cx={x} cy={yC} r="3" fill="#378add" stroke="white" strokeWidth="1.5" />
                     <rect x={x - 4} y={0} width="8" height={chartH} fill="transparent"
                       onMouseEnter={() => setHovered(i)}
                       onMouseLeave={() => setHovered(null)}
                     />
-                    {hovered === i && <line x1={x} y1={0} x2={x} y2={chartH} stroke="#378add" strokeWidth="1" strokeOpacity="0.4" strokeDasharray="3 2" />}
+                    {hovered === i && <line x1={x} y1={0} x2={x} y2={chartH} stroke="#378add" strokeWidth="0.8" strokeOpacity="0.4" strokeDasharray="3 2" />}
                   </g>
                 );
               })}
