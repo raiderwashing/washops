@@ -495,23 +495,49 @@ function MapView({ pins, setPins, currentUser, allUsers, jobs, setJobs, zones, s
         clickable: false,
         map: googleMapRef.current,
       });
-      // Zone label
+      // Zone label - avatar circle with initials
       const bounds = new window.google.maps.LatLngBounds();
       zone.points.forEach(p => bounds.extend(p));
       const center = bounds.getCenter();
-      const label = new window.google.maps.Marker({
-        position: center,
-        map: googleMapRef.current,
-        icon: { path: window.google.maps.SymbolPath.CIRCLE, scale: 0 },
-        label: {
-          text: `${zone.name}${rep ? ' · ' + rep.name.split(' ')[0] : ''}`,
-          color: '#378add',
-          fontWeight: 'bold',
-          fontSize: '12px',
-        },
-        zIndex: 1,
-      });
-      zonePolygonsRef.current.push(polygon, label);
+      const initials = rep ? rep.name.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase() : '?';
+      const labelEl = document.createElement('div');
+      labelEl.style.cssText = [
+        'background: #185fa5',
+        'color: white',
+        'width: 42px',
+        'height: 42px',
+        'border-radius: 50%',
+        'display: flex',
+        'align-items: center',
+        'justify-content: center',
+        'font-weight: 700',
+        'font-size: 15px',
+        'font-family: Inter, sans-serif',
+        'border: 3px solid white',
+        'box-shadow: 0 2px 10px rgba(0,0,0,0.35)',
+        'cursor: default',
+        'user-select: none',
+        'letter-spacing: 0.5px',
+      ].join(';');
+      labelEl.textContent = initials;
+      labelEl.title = `${zone.name}${rep ? ' · ' + rep.name : ''}`;
+      const overlay = new window.google.maps.OverlayView();
+      overlay.onAdd = function() {
+        this.getPanes().floatPane.appendChild(labelEl);
+      };
+      overlay.draw = function() {
+        const pos = this.getProjection().fromLatLngToDivPixel(center);
+        if (pos) {
+          labelEl.style.left = (pos.x - 21) + 'px';
+          labelEl.style.top = (pos.y - 21) + 'px';
+          labelEl.style.position = 'absolute';
+        }
+      };
+      overlay.onRemove = function() {
+        if (labelEl.parentNode) labelEl.parentNode.removeChild(labelEl);
+      };
+      overlay.setMap(googleMapRef.current);
+      zonePolygonsRef.current.push(polygon, overlay);
     });
   }, [zones, mapReady]);
 
