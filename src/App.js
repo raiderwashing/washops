@@ -274,7 +274,7 @@ function DoorLogModal({ pin, onClose, onSave, onDelete, techs, allJobs }) {
   });
   const [showTechPicker, setShowTechPicker] = useState(false);
   const [saving, setSaving] = useState(false);
-  const isMobile = false;
+  const isMobile = useIsMobile();
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const showPlan = form.status === 'appointment' || form.status === 'closed';
 
@@ -915,7 +915,7 @@ function ScheduleView({ jobs, setJobs, currentUser, allUsers }) {
   const [selected, setSelected] = useState(null);
   const [view, setView] = useState('month'); // month | week | day
   const [currentDate, setCurrentDate] = useState(new Date());
-  const isMobile = false;
+  const isMobile = useIsMobile();
   const today = new Date();
   const visible = currentUser.role === 'admin' ? jobs : currentUser.role === 'rep' ? jobs.filter(j => String(j.rep_id) === String(currentUser.id)) : jobs.filter(j => String(j.tech_id) === String(currentUser.id));
   const techs = allUsers.filter(u => u.role === 'tech');
@@ -1389,7 +1389,7 @@ function RevenueChart({ jobs }) {
 }
 
 function AdminDashboard({ pins, jobs, allUsers, onRefresh }) {
-  const isMobile = false;
+  const isMobile = useIsMobile();
   const reps = allUsers.filter(u => u.role === 'rep');
   const techs = allUsers.filter(u => u.role === 'tech');
   const pendingRevenue = jobs.filter(j => j.status === 'serviced').reduce((s, j) => s + (j.price || 0), 0);
@@ -1505,7 +1505,7 @@ function AdminDashboard({ pins, jobs, allUsers, onRefresh }) {
 
 // ─── Rep Dashboard ────────────────────────────────────────────────────────────
 function RepDashboard({ pins, jobs, currentUser }) {
-  const isMobile = false;
+  const isMobile = useIsMobile();
   const my = pins.filter(p => String(p.rep_id) === String(currentUser.id));
   const knocked = my.length, appts = my.filter(p => p.status === 'appointment').length, closed = my.filter(p => ['closed','paid'].includes(p.status)).length;
   const rev = jobs.filter(j => j.rep_id === currentUser.id && ['complete','paid'].includes(j.status)).reduce((s, j) => s + (j.price || 0), 0);
@@ -1548,7 +1548,7 @@ function RepDashboard({ pins, jobs, currentUser }) {
 
 // ─── Tech Dashboard ───────────────────────────────────────────────────────────
 function TechDashboard({ jobs, setJobs, currentUser }) {
-  const isMobile = false;
+  const isMobile = useIsMobile();
   const my = jobs.filter(j => j.tech_id && String(j.tech_id).trim() === String(currentUser.id).trim());
   const pending = my.filter(j => j.status === 'scheduled');
   const done = my.filter(j => ['serviced','complete','paid'].includes(j.status));
