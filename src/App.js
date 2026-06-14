@@ -1956,10 +1956,6 @@ function PayrollView({ jobs, allUsers, setAllUsers }) {
                   </div>
                 );
               })}
-                  {e.repRate > 0 && <div style={{ textAlign: 'right' }}><div style={{ fontSize: 10, color: '#6b7280' }}>Rep Rate</div><div style={{ fontSize: 13, color: '#10b981', fontWeight: 700 }}>{e.repRate}%</div></div>}
-                  {e.techRate > 0 && <div style={{ textAlign: 'right' }}><div style={{ fontSize: 10, color: '#6b7280' }}>Tech Rate</div><div style={{ fontSize: 13, color: '#f59e0b', fontWeight: 700 }}>{e.techRate}%</div></div>}
-                </div>
-              </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
                   {userJobs.map(j => {
                     const isRep = String(j.rep_id) === String(user.id);
