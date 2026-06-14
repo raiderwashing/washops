@@ -1848,27 +1848,19 @@ function PayrollView({ jobs, allUsers, setAllUsers }) {
 
   const workers = allUsers.filter(u => ['rep', 'tech', 'admin'].includes(u.role));
 
-  // Get all complete jobs for a user (as rep or tech)
   const getEarnings = (user) => {
     const completeJobs = jobs.filter(j => ['complete', 'paid', 'serviced'].includes(j.status));
-    
     const repJobs = completeJobs.filter(j => String(j.rep_id) === String(user.id));
     const techJobs = completeJobs.filter(j => String(j.tech_id) === String(user.id));
-    
     const repRate = (user.rep_rate || 0) / 100;
     const techRate = (user.tech_rate || 0) / 100;
-    
     const repEarnings = repJobs.reduce((s, j) => s + (j.price || 0) * repRate, 0);
     const techEarnings = techJobs.reduce((s, j) => s + (j.price || 0) * techRate, 0);
-    
     return {
-      repJobs: repJobs.length,
-      techJobs: techJobs.length,
-      repEarnings,
-      techEarnings,
+      repJobs: repJobs.length, techJobs: techJobs.length,
+      repEarnings, techEarnings,
       total: repEarnings + techEarnings,
-      repRate: user.rep_rate || 0,
-      techRate: user.tech_rate || 0,
+      repRate: user.rep_rate || 0, techRate: user.tech_rate || 0,
     };
   };
 
@@ -1889,76 +1881,85 @@ function PayrollView({ jobs, allUsers, setAllUsers }) {
   };
 
   const totalPayroll = workers.reduce((s, u) => s + getEarnings(u).total, 0);
-  const completeJobs = jobs.filter(j => ['complete','paid','serviced'].includes(j.status));
-  const totalRevenue = completeJobs.reduce((s, j) => s + (j.price || 0), 0);
+  const totalRevenue = jobs.filter(j => ['complete','paid','serviced'].includes(j.status)).reduce((s, j) => s + (j.price || 0), 0);
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <div style={s.topbar}>
         <div style={s.topbarTitle}>💰 Payroll</div>
       </div>
-      <div style={s.page}>
+      <div style={{ ...s.page, padding: isMobile ? 12 : 20 }}>
 
         {/* Summary stats */}
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3,1fr)', gap: isMobile ? 8 : 12, marginBottom: isMobile ? 14 : 24 }}>
           <div style={s.card()}>
             <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>Total Revenue Collected</div>
-            <div style={{ fontWeight: 800, fontSize: 26, color: '#f59e0b' }}>${totalRevenue.toFixed(2)}</div>
+            <div style={{ fontWeight: 800, fontSize: 22, color: '#f59e0b' }}>${totalRevenue.toFixed(2)}</div>
           </div>
           <div style={s.card()}>
             <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>Total Payroll Owed</div>
-            <div style={{ fontWeight: 800, fontSize: 26, color: '#ef4444' }}>${totalPayroll.toFixed(2)}</div>
+            <div style={{ fontWeight: 800, fontSize: 22, color: '#ef4444' }}>${totalPayroll.toFixed(2)}</div>
           </div>
           <div style={s.card()}>
             <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>Net After Payroll</div>
-            <div style={{ fontWeight: 800, fontSize: 26, color: '#10b981' }}>${(totalRevenue - totalPayroll).toFixed(2)}</div>
+            <div style={{ fontWeight: 800, fontSize: 22, color: '#10b981' }}>${(totalRevenue - totalPayroll).toFixed(2)}</div>
           </div>
         </div>
 
         {/* Per person breakdown */}
-        {/* Per person breakdown */}
-        <div style={{ background: '#ffffff', border: '1px solid #e8ecf0', borderRadius: 8, overflow: 'hidden', marginBottom: 24 }}>
-          <div style={{ padding: '14px 16px', borderBottom: '1px solid #e2e4e8', fontWeight: 700, fontSize: 14, color: '#1a1a2e' }}>Team Earnings</div>
-          {workers.map(user => {
-            const e = getEarnings(user);
-            const roleColor2 = user.role === 'rep' ? '#10b981' : user.role === 'tech' ? '#f59e0b' : '#378add';
-            return (
-              <div key={user.id} style={{ padding: '12px 16px', borderBottom: '1px solid #f0f2f5', display: 'flex', alignItems: 'center', gap: 10 }}>
-                <Avatar name={user.name} role={user.role} size={36} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                    <span style={{ fontWeight: 600, fontSize: 13 }}>{user.name}</span>
-                    <span style={{ fontWeight: 800, fontSize: 14, color: e.total > 0 ? '#ef4444' : '#9ca3af' }}>${e.total.toFixed(2)}</span>
-                  </div>
-                  <div style={{ display: 'flex', gap: 8, fontSize: 11, color: '#9ca3af', flexWrap: 'wrap' }}>
-                    <span style={{ color: roleColor2, textTransform: 'capitalize', fontWeight: 600 }}>{user.role}</span>
-                    {e.repRate > 0 && <span>Rep {e.repRate}% · <span style={{ color: '#10b981' }}>${e.repEarnings.toFixed(2)}</span></span>}
-                    {e.techRate > 0 && <span>Tech {e.techRate}% · <span style={{ color: '#f59e0b' }}>${e.techEarnings.toFixed(2)}</span></span>}
-                    {e.repRate === 0 && e.techRate === 0 && <span style={{ color: '#9ca3af' }}>No rate set</span>}
+        {workers.map(user => {
+          const e = getEarnings(user);
+          const userJobs = jobs.filter(j => ['complete','paid','serviced'].includes(j.status) && (String(j.rep_id) === String(user.id) || String(j.tech_id) === String(user.id)));
+          const roleColor2 = user.role === 'rep' ? '#10b981' : user.role === 'tech' ? '#f59e0b' : '#378add';
+          return (
+            <div key={user.id} style={{ ...s.card({ marginBottom: 12 }) }}>
+              {/* Header row */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <Avatar name={user.name} role={user.role} size={32} />
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 14 }}>{user.name}</div>
+                    <div style={{ fontSize: 11, color: '#9ca3af' }}>
+                      <span style={{ color: roleColor2, textTransform: 'capitalize', fontWeight: 600 }}>{user.role}</span>
+                      {e.repRate > 0 && <span> · Rep {e.repRate}%</span>}
+                      {e.techRate > 0 && <span> · Tech {e.techRate}%</span>}
+                    </div>
                   </div>
                 </div>
-                <button style={{ ...s.btnGhost, fontSize: 11, padding: '6px 10px', flexShrink: 0 }} onClick={() => openEdit(user)}>✏️</button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 10, color: '#9ca3af' }}>Owed</div>
+                    <div style={{ fontWeight: 800, fontSize: 16, color: e.total > 0 ? '#ef4444' : '#9ca3af' }}>${e.total.toFixed(2)}</div>
+                  </div>
+                  <button style={{ ...s.btnGhost, fontSize: 11, padding: '6px 10px' }} onClick={() => openEdit(user)}>✏️ Rate</button>
+                </div>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+
+              {/* Job list */}
+              {userJobs.length > 0 && (
+                <div style={{ borderTop: '1px solid #f0f2f5', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {userJobs.map(j => {
                     const isRep = String(j.rep_id) === String(user.id);
                     const isTech = String(j.tech_id) === String(user.id);
                     const rate = isRep ? e.repRate : e.techRate;
                     const earned = (j.price || 0) * rate / 100;
                     return (
-                      <div key={j.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#f8f9fb', borderRadius: 6 }}>
+                      <div key={j.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 8px', background: '#f8f9fb', borderRadius: 6 }}>
                         <div>
                           <div style={{ fontWeight: 600, fontSize: 13 }}>{j.customer_name}</div>
-                          <div style={{ fontSize: 11, color: '#6b7280', marginTop: 1, textTransform: 'capitalize' }}>{j.service} · {isRep && isTech ? 'Rep + Tech' : isRep ? 'Rep' : 'Tech'} · {rate}%</div>
+                          <div style={{ fontSize: 11, color: '#6b7280', textTransform: 'capitalize' }}>
+                            {j.service} · {isRep && isTech ? 'Rep + Tech' : isRep ? 'Rep' : 'Tech'} · {rate}%
+                          </div>
                         </div>
                         <div style={{ textAlign: 'right' }}>
-                          <div style={{ fontSize: 12, color: '#6b7280' }}>${j.price}</div>
+                          <div style={{ fontSize: 11, color: '#9ca3af' }}>${j.price}</div>
                           <div style={{ fontWeight: 700, fontSize: 13, color: '#10b981' }}>+${earned.toFixed(2)}</div>
                         </div>
                       </div>
                     );
                   })}
                 </div>
+              )}
             </div>
           );
         })}
@@ -1967,7 +1968,7 @@ function PayrollView({ jobs, allUsers, setAllUsers }) {
       {/* Edit rate modal */}
       {editingRate && (
         <div style={s.backdrop} onClick={e => e.target === e.currentTarget && setEditingRate(null)}>
-          <div style={{ ...s.modal, width: 360 }}>
+          <div style={isMobile ? { background: '#ffffff', border: '1px solid #e2e4e8', borderRadius: '16px 16px 0 0', padding: 24, width: '100%', maxHeight: '85vh', overflowY: 'auto', position: 'fixed', bottom: 0, left: 0, right: 0 } : { ...s.modal, width: 360 }}>
             <div style={{ fontWeight: 700, fontSize: 17, marginBottom: 6 }}>Set Pay Rate</div>
             <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 20 }}>{editingRate.name}</div>
             <div style={s.twoCol}>
@@ -1996,6 +1997,7 @@ function PayrollView({ jobs, allUsers, setAllUsers }) {
     </div>
   );
 }
+
 
 // ─── Main App ─────────────────────────────────────────────────────────────────
 export default function App() {
