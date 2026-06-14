@@ -37,8 +37,9 @@ const s = {
 
 const STATUS_CONFIG = {
   'not-interested': { label: 'Not Interested', color: '#ef4444', bg: 'rgba(239,68,68,0.15)' },
-  'not-home': { label: 'Not Home', color: '#e879f9', bg: 'rgba(232,121,249,0.15)' },
+  'not-home': { label: 'Not Home', color: '#9ca3af', bg: 'rgba(156,163,175,0.15)' },
   'follow-up': { label: 'Follow Up', color: '#f59e0b', bg: 'rgba(245,158,11,0.15)' },
+  'gave-pitch': { label: 'Gave Pitch', color: '#185fa5', bg: 'rgba(24,95,165,0.12)' },
   appointment: { label: 'Appt Set', color: '#10b981', bg: 'rgba(16,185,129,0.15)' },
   closed: { label: 'Closed', color: '#378add', bg: 'rgba(55,138,221,0.15)' },
   scheduled: { label: 'Scheduled', color: '#378add', bg: 'rgba(55,138,221,0.15)' },
@@ -48,7 +49,7 @@ const STATUS_CONFIG = {
   cancelled: { label: 'Cancelled', color: '#ef4444', bg: 'rgba(239,68,68,0.15)' },
 };
 
-const PIN_COLORS = { 'not-interested': '#ef4444', 'not-home': '#e879f9', 'follow-up': '#f59e0b', appointment: '#10b981', closed: '#378add', paid: '#7c3aed' };
+const PIN_COLORS = { 'not-interested': '#ef4444', 'not-home': '#9ca3af', 'follow-up': '#f59e0b', 'gave-pitch': '#185fa5', appointment: '#10b981', closed: '#378add', paid: '#7c3aed' };
 
 // Mobile styles injected into head
 if (!document.getElementById('washops-mobile-styles')) {
@@ -318,6 +319,7 @@ function DoorLogModal({ pin, onClose, onSave, onDelete, techs, allJobs }) {
             <select style={s.select} value={form.status} onChange={e => set('status', e.target.value)}>
               <option value="follow-up">🟡 Follow Up</option>
               <option value="not-home">🟣 Not Home</option>
+              <option value="gave-pitch">🟤 Gave Pitch</option>
               <option value="not-interested">🔴 Not Interested</option>
               <option value="appointment">🟢 Appt Set</option>
               <option value="closed">🔵 Closed</option>
@@ -574,6 +576,65 @@ function MapView({ pins, setPins, currentUser, allUsers, jobs, setJobs, zones, s
       markersRef.current.push(marker);
     });
   }, [visiblePins, mapReady]);
+
+  // Render gold star overlays for serviced pins - visible to everyone
+  const starOverlaysRef = React.useRef([]);
+  useEffect(() => {
+    if (!googleMapRef.current || !mapReady) return;
+    // Clear old star overlays
+    starOverlaysRef.current.forEach(o => o.setMap(null));
+    starOverlaysRef.current = [];
+
+    // Show gold star on all serviced/closed pins that have been cleaned
+    const servicedPins = pins.filter(p => p.status === 'closed' || p.status === 'paid');
+    servicedPins.forEach(pin => {
+      if (!pin.lat || !pin.lng) return;
+      const starEl = document.createElement('div');
+      starEl.style.cssText = [
+        'position: absolute',
+        'font-size: 18px',
+        'cursor: pointer',
+        'user-select: none',
+        'filter: drop-shadow(0 1px 3px rgba(0,0,0,0.4))',
+        'transform: translate(-50%, -100%)',
+        'margin-top: -8px',
+      ].join(';');
+      starEl.textContent = '⭐';
+      starEl.title = `${pin.name || 'Customer'} · $${pin.price || 0} · Previously serviced`;
+
+      // Click to show info
+      starEl.onclick = () => {
+        window._starInfo = pin;
+        const info = new window.google.maps.InfoWindow({
+          content: `<div style="font-family:Inter,sans-serif;padding:4px;min-width:180px">
+            <div style="font-weight:700;font-size:14px;margin-bottom:4px">⭐ ${pin.name || 'Customer'}</div>
+            <div style="font-size:12px;color:#6b7280;margin-bottom:2px">📍 ${pin.address?.split(',')[0] || ''}</div>
+            <div style="font-size:12px;margin-bottom:2px"><b>Sold:</b> $${pin.price || 0} · ${pin.service || ''}</div>
+            <div style="font-size:11px;color:#9ca3af">Previously serviced — potential re-sell</div>
+          </div>`,
+          position: { lat: pin.lat, lng: pin.lng },
+        });
+        info.open(googleMapRef.current);
+      };
+
+      const overlay = new window.google.maps.OverlayView();
+      overlay.onAdd = function() {
+        this.getPanes().floatPane.appendChild(starEl);
+      };
+      overlay.draw = function() {
+        const pos = this.getProjection().fromLatLngToDivPixel({ lat: pin.lat, lng: pin.lng });
+        if (pos) {
+          starEl.style.left = pos.x + 'px';
+          starEl.style.top = (pos.y - 20) + 'px';
+        }
+      };
+      overlay.onRemove = function() {
+        if (starEl.parentNode) starEl.parentNode.removeChild(starEl);
+      };
+      overlay.setMap(googleMapRef.current);
+      starOverlaysRef.current.push(overlay);
+    });
+  }, [pins, mapReady]);
 
   // Render zone polygons on the map - visible to all roles
   useEffect(() => {
@@ -1396,7 +1457,8 @@ function AdminDashboard({ pins, jobs, allUsers, onRefresh }) {
   const revenue = jobs.filter(j => ['complete','paid'].includes(j.status)).reduce((s, j) => s + (j.price || 0), 0);
   const scheduled = jobs.filter(j => j.status === 'scheduled').length;
   const serviced = jobs.filter(j => j.status === 'serviced').length;
-  const conv = pins.length ? Math.round(pins.filter(p => ['closed','paid','appointment'].includes(p.status)).length / pins.length * 100) : 0;
+  const pitches = pins.filter(p => ['gave-pitch','appointment','closed','paid','serviced'].includes(p.status)).length;
+  const conv = pitches > 0 ? Math.round(pins.filter(p => ['closed','paid','appointment'].includes(p.status)).length / pitches * 100) : 0;
   const knockers = [...reps, ...allUsers.filter(u => u.role === 'admin')];
   const repStats = knockers.map(r => ({
     ...r,
@@ -1507,7 +1569,10 @@ function AdminDashboard({ pins, jobs, allUsers, onRefresh }) {
 function RepDashboard({ pins, jobs, currentUser }) {
   const isMobile = useIsMobile();
   const my = pins.filter(p => String(p.rep_id) === String(currentUser.id));
-  const knocked = my.length, appts = my.filter(p => p.status === 'appointment').length, closed = my.filter(p => ['closed','paid'].includes(p.status)).length;
+  const knocked = my.length;
+    const pitched = my.filter(p => ['gave-pitch','appointment','closed','paid'].includes(p.status)).length;
+    const appts = my.filter(p => p.status === 'appointment').length;
+    const closed = my.filter(p => ['closed','paid'].includes(p.status)).length;
   const rev = jobs.filter(j => j.rep_id === currentUser.id && ['complete','paid'].includes(j.status)).reduce((s, j) => s + (j.price || 0), 0);
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -1518,7 +1583,7 @@ function RepDashboard({ pins, jobs, currentUser }) {
         </div>
         <div style={{ ...s.card(), marginBottom: 20 }}>
           <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 14 }}>Conversion Funnel</div>
-          {[['Knocked', knocked, 100, '#6b7280'], ['Appointments', appts, knocked ? (appts/knocked)*100 : 0, '#f59e0b'], ['Closed', closed, knocked ? (closed/knocked)*100 : 0, '#10b981']].map(([label, val, pct, color]) => (
+          {[['Knocked', knocked, 100, '#9ca3af'], ['Pitched', pitched, knocked ? (pitched/knocked)*100 : 0, '#185fa5'], ['Appt Set', appts, pitched ? (appts/pitched)*100 : 0, '#f59e0b'], ['Closed', closed, pitched ? (closed/pitched)*100 : 0, '#10b981']].map(([label, val, pct, color]) => (
             <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
               <span style={{ fontSize: 12, width: 90 }}>{label}</span>
               <div style={{ flex: 1, height: 7, background: '#f8f9fb', borderRadius: 4, overflow: 'hidden' }}><div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 4 }} /></div>
