@@ -1938,6 +1938,7 @@ function PayrollView({ jobs, allUsers, setAllUsers }) {
                   </div>
                 </div>
                 <button style={{ ...s.btnGhost, fontSize: 11, padding: '6px 10px', flexShrink: 0 }} onClick={() => openEdit(user)}>✏️</button>
+              </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
                   {userJobs.map(j => {
                     const isRep = String(j.rep_id) === String(user.id);
