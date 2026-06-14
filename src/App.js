@@ -1113,20 +1113,21 @@ function ScheduleView({ jobs, setJobs, currentUser, allUsers }) {
         {view === 'month' && <MonthView />}
         {view === 'week' && <WeekView />}
         {view === 'day' && <DayView />}
-        <div style={{ background: '#ffffff', border: '1px solid #2a2a3a', borderRadius: 8, overflow: 'hidden' }}>
+        <div style={{ background: '#ffffff', border: '1px solid #e8ecf0', borderRadius: 8, overflow: 'hidden' }}>
           <div style={{ padding: '14px 16px', borderBottom: '1px solid #e2e4e8', fontWeight: 700, fontSize: 14, color: '#1a1a2e' }}>All Jobs</div>
-          <table style={s.table}>
-            <thead><tr><th style={s.th}>Customer</th><th style={s.th}>Service</th><th style={s.th}>Date · Time</th><th style={s.th}>Status</th><th style={s.th}>Price</th></tr></thead>
-            <tbody>{visible.map(j => (
-              <tr key={j.id} style={{ cursor: 'pointer' }} onClick={() => setSelected(j)}>
-                <td style={s.td}>{j.customer_name}</td>
-                <td style={{ ...s.td, textTransform: 'capitalize', fontSize: 12 }}>{j.service}</td>
-                <td style={{ ...s.td, fontSize: 12, color: '#6b7280' }}>{j.scheduled_date || '—'} {j.scheduled_time && `· ${j.scheduled_time}`}</td>
-                <td style={s.td}><Badge status={j.status} /></td>
-                <td style={{ ...s.td, fontWeight: 700 }}>${j.price}</td>
-              </tr>
-            ))}</tbody>
-          </table>
+          {visible.map(j => (
+            <div key={j.id} style={{ padding: '12px 16px', borderBottom: '1px solid #f0f2f5', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }} onClick={() => setSelected(j)}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2 }}>{j.customer_name}</div>
+                <div style={{ fontSize: 11, color: '#9ca3af' }}>{j.scheduled_date || '—'} {j.scheduled_time && `· ${j.scheduled_time}`} · <span style={{ textTransform: 'capitalize' }}>{j.service}</span></div>
+              </div>
+              <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 8 }}>
+                <div style={{ fontWeight: 700, fontSize: 14, color: '#1a1a2e', marginBottom: 3 }}>${j.price}</div>
+                <Badge status={j.status} />
+              </div>
+            </div>
+          ))}
+        </div>
         </div>
       </div>
       {selected && (
@@ -1268,7 +1269,7 @@ function RevenueChart({ jobs }) {
   return (
     <div style={{ ...s.card({ marginBottom: 20 }) }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: expanded ? 16 : 0 }}>
-        <div style={{ fontWeight: 700, fontSize: 14 }}>📈 Revenue Over Time</div>
+        <div style={{ fontWeight: 700, fontSize: 13, whiteSpace: 'nowrap' }}>📈 Revenue</div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           {expanded && ['day','week','month','year'].map(v => (
             <button key={v} onClick={() => setView(v)} style={{ ...s.btnGhost, background: view === v ? '#378add' : '#f8f9fb', color: view === v ? 'white' : '#6b7280', border: 'none', fontSize: 11, padding: '4px 10px', textTransform: 'capitalize' }}>{v}</button>
@@ -1413,20 +1414,34 @@ function AdminDashboard({ pins, jobs, allUsers, onRefresh }) {
         <button style={s.btnGhost} onClick={onRefresh}>🔄 Refresh</button>
       </div>
       <div style={s.page}>
-        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(5,1fr)', gap: isMobile ? 8 : 12, marginBottom: isMobile ? 16 : 20 }}>
-          {[
-            { l: '⭐ Complete ⭐', v: `$${revenue}`, c: '#f59e0b' },
-            { l: 'Pending Rev', v: `$${pendingRevenue}`, c: '#10b981' },
-            { l: 'Scheduled', v: scheduled, c: '#378add' },
-            { l: 'Serviced', v: serviced, c: '#10b981' },
-            { l: 'Conversion', v: `${conv}%`, c: '#1a1a2e' },
-          ].map((st, i) => (
-            <div key={i} style={s.card()}><div style={{ fontSize: isMobile ? 10 : 11, color: '#6b7280', marginBottom: 4 }}>{st.l}</div><div style={{ fontWeight: 800, fontSize: isMobile ? 20 : 24, color: st.c }}>{st.v}</div></div>
-          ))}
-        </div>
+        {isMobile ? (
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+              <div style={s.card()}><div style={{ fontSize: 10, color: '#6b7280', marginBottom: 3 }}>⭐ Complete</div><div style={{ fontWeight: 700, fontSize: 20, color: '#f59e0b' }}>${revenue}</div></div>
+              <div style={s.card()}><div style={{ fontSize: 10, color: '#6b7280', marginBottom: 3 }}>Pending Rev</div><div style={{ fontWeight: 700, fontSize: 20, color: '#10b981' }}>${pendingRevenue}</div></div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+              <div style={{ ...s.card(), padding: 10 }}><div style={{ fontSize: 10, color: '#6b7280', marginBottom: 2 }}>Scheduled</div><div style={{ fontWeight: 700, fontSize: 18, color: '#378add' }}>{scheduled}</div></div>
+              <div style={{ ...s.card(), padding: 10 }}><div style={{ fontSize: 10, color: '#6b7280', marginBottom: 2 }}>Serviced</div><div style={{ fontWeight: 700, fontSize: 18, color: '#10b981' }}>{serviced}</div></div>
+              <div style={{ ...s.card(), padding: 10 }}><div style={{ fontSize: 10, color: '#6b7280', marginBottom: 2 }}>Conv.</div><div style={{ fontWeight: 700, fontSize: 18, color: '#1a1a2e' }}>{conv}%</div></div>
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 12, marginBottom: 20 }}>
+            {[
+              { l: '⭐ Complete ⭐', v: `$${revenue}`, c: '#f59e0b' },
+              { l: 'Pending Rev', v: `$${pendingRevenue}`, c: '#10b981' },
+              { l: 'Scheduled', v: scheduled, c: '#378add' },
+              { l: 'Serviced', v: serviced, c: '#10b981' },
+              { l: 'Conversion', v: `${conv}%`, c: '#1a1a2e' },
+            ].map((st, i) => (
+              <div key={i} style={s.card()}><div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>{st.l}</div><div style={{ fontWeight: 800, fontSize: 24, color: st.c }}>{st.v}</div></div>
+            ))}
+          </div>
+        )}
         <RevenueChart jobs={jobs} />
 
-        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12, marginBottom: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12, marginBottom: 16 }}>
           <div style={s.card()}>
             <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 16 }}>Rep Performance</div>
             {repStats.length === 0 && <div style={{ color: '#9ca3af', fontSize: 13 }}>No reps yet</div>}
@@ -1469,12 +1484,20 @@ function AdminDashboard({ pins, jobs, allUsers, onRefresh }) {
             })}
           </div>
         </div>
-        <div style={{ background: '#ffffff', border: '1px solid #2a2a3a', borderRadius: 8, overflow: 'hidden' }}>
+        <div style={{ background: '#ffffff', border: '1px solid #e8ecf0', borderRadius: 8, overflow: 'hidden' }}>
           <div style={{ padding: '14px 16px', borderBottom: '1px solid #e2e4e8', fontWeight: 700, fontSize: 14, color: '#1a1a2e' }}>Recent Jobs</div>
-          <table style={s.table}>
-            <thead><tr><th style={s.th}>Customer</th><th style={s.th}>Service</th><th style={s.th}>Rep</th><th style={s.th}>Tech</th><th style={s.th}>Status</th><th style={s.th}>Amount</th></tr></thead>
-            <tbody>{jobs.slice(0, 20).map(j => { const rep = allUsers.find(u => u.id === j.rep_id); const tech = allUsers.find(u => u.id === j.tech_id); return <tr key={j.id}><td style={s.td}>{j.customer_name}</td><td style={{ ...s.td, textTransform: 'capitalize', fontSize: 12 }}>{j.service}</td><td style={{ ...s.td, fontSize: 12 }}>{rep?.name || '—'}</td><td style={{ ...s.td, fontSize: 12 }}>{tech?.name || '—'}</td><td style={s.td}><Badge status={j.status} /></td><td style={{ ...s.td, fontWeight: 700, color: j.status === 'paid' ? '#10b981' : '#1a1a2e' }}>${j.price}</td></tr>; })}</tbody>
-          </table>
+          {jobs.slice(0, 20).map(j => { const rep = allUsers.find(u => u.id === j.rep_id); const tech = allUsers.find(u => u.id === j.tech_id); return (
+            <div key={j.id} style={{ padding: '12px 16px', borderBottom: '1px solid #f0f2f5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2 }}>{j.customer_name}</div>
+                <div style={{ fontSize: 11, color: '#9ca3af' }}>{rep?.name?.split(' ')[0] || '—'} → {tech?.name?.split(' ')[0] || '—'} · <span style={{ textTransform: 'capitalize' }}>{j.service}</span></div>
+              </div>
+              <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 8 }}>
+                <div style={{ fontWeight: 700, fontSize: 14, color: ['paid','complete','serviced'].includes(j.status) ? '#10b981' : '#1a1a2e', marginBottom: 3 }}>${j.price}</div>
+                <Badge status={j.status} />
+              </div>
+            </div>
+          ); })}
         </div>
       </div>
     </div>
@@ -1504,12 +1527,20 @@ function RepDashboard({ pins, jobs, currentUser }) {
             </div>
           ))}
         </div>
-        <div style={{ background: '#ffffff', border: '1px solid #2a2a3a', borderRadius: 8, overflow: 'hidden' }}>
+        <div style={{ background: '#ffffff', border: '1px solid #e8ecf0', borderRadius: 8, overflow: 'hidden' }}>
           <div style={{ padding: '14px 16px', borderBottom: '1px solid #e2e4e8', fontWeight: 700, fontSize: 14, color: '#1a1a2e' }}>My Pins</div>
-          <table style={s.table}>
-            <thead><tr><th style={s.th}>Address</th><th style={s.th}>Name</th><th style={s.th}>Status</th><th style={s.th}>Service</th></tr></thead>
-            <tbody>{my.slice(0, 15).map(p => <tr key={p.id}><td style={{ ...s.td, fontSize: 12 }}>{p.address}</td><td style={s.td}>{p.name || '—'}</td><td style={s.td}><Badge status={p.status} /></td><td style={{ ...s.td, fontSize: 12, textTransform: 'capitalize' }}>{p.service || '—'}</td></tr>)}</tbody>
-          </table>
+          {my.slice(0, 15).map(p => (
+            <div key={p.id} style={{ padding: '11px 16px', borderBottom: '1px solid #f0f2f5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 1 }}>{p.name || 'Unknown'}</div>
+                <div style={{ fontSize: 11, color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 200 }}>{p.address}</div>
+              </div>
+              <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 8 }}>
+                <Badge status={p.status} />
+                {p.service && <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 2, textTransform: 'capitalize' }}>{p.service}</div>}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>
@@ -1569,17 +1600,42 @@ function TechDashboard({ jobs, setJobs, currentUser }) {
 
 // ─── Customers ────────────────────────────────────────────────────────────────
 function CustomersView({ pins, jobs }) {
+  const isMobile = useIsMobile();
   const customers = pins.filter(p => ['closed','paid','appointment'].includes(p.status));
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <div style={s.topbar}><div style={s.topbarTitle}>👥 Customers</div><span style={{ fontSize: 12, color: '#6b7280' }}>{customers.length} active</span></div>
-      <div style={s.page}>
-        <div style={{ background: '#ffffff', border: '1px solid #2a2a3a', borderRadius: 8, overflow: 'hidden' }}>
-          <table style={s.table}>
-            <thead><tr><th style={s.th}>Name</th><th style={s.th}>Address</th><th style={s.th}>Plan</th><th style={s.th}>Price</th><th style={s.th}>Status</th><th style={s.th}>Card on File</th><th style={s.th}>Notes</th></tr></thead>
-            <tbody>{customers.map(c => { const job = jobs.find(j => j.address === c.address); return <tr key={c.id}><td style={{ ...s.td, fontWeight: 500 }}>{c.name || 'Unknown'}</td><td style={{ ...s.td, fontSize: 12, color: '#6b7280' }}>{c.address}</td><td style={{ ...s.td, fontSize: 12, textTransform: 'capitalize' }}>{c.service || '—'}</td><td style={{ ...s.td, fontWeight: 700 }}>{c.price ? `$${c.price}` : '—'}</td><td style={s.td}><Badge status={c.status} /></td><td style={{ ...s.td, fontSize: 12, color: job?.card_on_file ? '#10b981' : '#9ca3af' }}>{job?.card_on_file ? '✅ On file' : '—'}</td><td style={{ ...s.td, fontSize: 12, color: '#6b7280', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.notes}</td></tr>; })}</tbody>
-          </table>
-        </div>
+      <div style={{ ...s.page, padding: isMobile ? 12 : 20 }}>
+        {isMobile ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {customers.map(c => {
+              const job = jobs.find(j => j.address === c.address);
+              return (
+                <div key={c.id} style={{ background: '#ffffff', border: '1px solid #e8ecf0', borderRadius: 8, padding: 14 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <div style={{ fontWeight: 600, fontSize: 15 }}>{c.name || 'Unknown'}</div>
+                    <Badge status={c.status} />
+                  </div>
+                  <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}>📍 {c.address}</div>
+                  <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 12, textTransform: 'capitalize' }}><span style={{ color: '#9ca3af' }}>Plan: </span>{c.service || '—'}</span>
+                    <span style={{ fontSize: 12, fontWeight: 700 }}><span style={{ color: '#9ca3af', fontWeight: 400 }}>Price: </span>{c.price ? `$${c.price}` : '—'}</span>
+                    <span style={{ fontSize: 12, color: job?.card_on_file ? '#10b981' : '#9ca3af' }}>{job?.card_on_file ? '✅ Card on file' : 'No card'}</span>
+                  </div>
+                  {c.notes && <div style={{ fontSize: 12, color: '#6b7280', marginTop: 8, borderTop: '1px solid #f0f2f5', paddingTop: 8 }}>📝 {c.notes}</div>}
+                </div>
+              );
+            })}
+            {customers.length === 0 && <div style={{ textAlign: 'center', padding: 48, color: '#9ca3af' }}>No customers yet</div>}
+          </div>
+        ) : (
+          <div style={{ background: '#ffffff', border: '1px solid #e8ecf0', borderRadius: 8, overflow: 'hidden' }}>
+            <table style={s.table}>
+              <thead><tr><th style={s.th}>Name</th><th style={s.th}>Address</th><th style={s.th}>Plan</th><th style={s.th}>Price</th><th style={s.th}>Status</th><th style={s.th}>Card on File</th><th style={s.th}>Notes</th></tr></thead>
+              <tbody>{customers.map(c => { const job = jobs.find(j => j.address === c.address); return <tr key={c.id}><td style={{ ...s.td, fontWeight: 500 }}>{c.name || 'Unknown'}</td><td style={{ ...s.td, fontSize: 12, color: '#6b7280' }}>{c.address}</td><td style={{ ...s.td, fontSize: 12, textTransform: 'capitalize' }}>{c.service || '—'}</td><td style={{ ...s.td, fontWeight: 700 }}>{c.price ? `$${c.price}` : '—'}</td><td style={s.td}><Badge status={c.status} /></td><td style={{ ...s.td, fontSize: 12, color: job?.card_on_file ? '#10b981' : '#9ca3af' }}>{job?.card_on_file ? '✅ On file' : '—'}</td><td style={{ ...s.td, fontSize: 12, color: '#6b7280', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.notes}</td></tr>; })}</tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1588,7 +1644,7 @@ function CustomersView({ pins, jobs }) {
 
 // ─── Team View ────────────────────────────────────────────────────────────────
 function TeamView({ allUsers, setAllUsers }) {
-  const isMobile = false;
+  const isMobile = useIsMobile();
   const [showModal, setShowModal] = useState(false);
   const [editUser, setEditUser] = useState(null);
   const [form, setForm] = useState({ name: '', email: '', phone: '', role: 'rep', password: '', active: true });
@@ -1683,7 +1739,7 @@ function TeamView({ allUsers, setAllUsers }) {
       </div>
       <div style={s.page}>
         {/* Stats */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 24 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3,1fr)', gap: isMobile ? 8 : 12, marginBottom: isMobile ? 14 : 24 }}>
           {[
             { l: 'Total Members', v: allUsers.length, c: '#1a1a2e' },
             { l: 'Reps', v: allUsers.filter(u => u.role === 'rep').length, c: '#10b981' },
@@ -1694,67 +1750,43 @@ function TeamView({ allUsers, setAllUsers }) {
         </div>
 
         {/* Team Table */}
-        <div style={{ background: '#ffffff', border: '1px solid #2a2a3a', borderRadius: 8, overflow: 'hidden' }}>
-          <table style={s.table}>
-            <thead>
-              <tr>
-                <th style={s.th}>Member</th>
-                <th style={s.th}>Role</th>
-                <th style={s.th}>Email</th>
-                <th style={s.th}>Phone</th>
-                <th style={s.th}>Temp Password</th>
-                <th style={s.th}>Status</th>
-                <th style={s.th}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {allUsers.map(user => (
-                <tr key={user.id}>
-                  <td style={s.td}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <Avatar name={user.name} role={user.role} size={30} />
-                      <span style={{ fontWeight: 600 }}>{user.name}</span>
-                    </div>
-                  </td>
-                  <td style={s.td}>
-                    <span style={{ background: `${roleColor[user.role]}22`, color: roleColor[user.role], padding: '3px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, textTransform: 'capitalize' }}>{user.role}</span>
-                  </td>
-                  <td style={{ ...s.td, fontSize: 12, color: '#6b7280' }}>{user.email}</td>
-                  <td style={{ ...s.td, fontSize: 12, color: '#6b7280' }}>{user.phone || '—'}</td>
-                  <td style={s.td}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 12, fontFamily: 'monospace', color: showPassFor === user.id ? '#1a1a2e' : '#9ca3af', letterSpacing: showPassFor === user.id ? 0 : 2 }}>
-                        {showPassFor === user.id ? (user.temp_password || '—') : '••••••••'}
-                      </span>
-                      <button onClick={() => setShowPassFor(showPassFor === user.id ? null : user.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: 12 }}>
-                        {showPassFor === user.id ? '🙈' : '👁'}
-                      </button>
-                    </div>
-                  </td>
-                  <td style={s.td}>
-                    <span style={{ background: user.active !== false ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)', color: user.active !== false ? '#10b981' : '#ef4444', padding: '3px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600 }}>
-                      {user.active !== false ? 'Active' : 'Inactive'}
-                    </span>
-                  </td>
-                  <td style={s.td}>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <button style={{ ...s.btnGhost, padding: '5px 10px', fontSize: 11 }} onClick={() => openEdit(user)}>Edit</button>
-                      {user.role !== 'admin' && (
-                        <button onClick={() => toggleActive(user)} style={{ padding: '5px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: 'none', background: user.active !== false ? 'rgba(239,68,68,0.15)' : 'rgba(16,185,129,0.15)', color: user.active !== false ? '#ef4444' : '#10b981' }}>
-                          {user.active !== false ? 'Deactivate' : 'Reactivate'}
-                        </button>
-                      )}
-                      {user.role !== 'admin' && (
-                        <button onClick={() => deleteUser(user)} style={{ padding: '5px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: '1px solid #ef4444', background: 'transparent', color: '#ef4444' }}>
-                          🗑 Delete
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div style={{ background: '#ffffff', border: '1px solid #e8ecf0', borderRadius: 8, overflow: 'hidden' }}>
+          {allUsers.map(user => (
+            <div key={user.id} style={{ padding: '14px 16px', borderBottom: '1px solid #f0f2f5' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                <Avatar name={user.name} role={user.role} size={36} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 2 }}>
+                    <span style={{ fontWeight: 600, fontSize: 14 }}>{user.name}</span>
+                    <span style={{ background: `${roleColor[user.role]}22`, color: roleColor[user.role], padding: '2px 8px', borderRadius: 8, fontSize: 11, fontWeight: 600, textTransform: 'capitalize' }}>{user.role}</span>
+                    <span style={{ background: user.active !== false ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)', color: user.active !== false ? '#10b981' : '#ef4444', padding: '2px 8px', borderRadius: 8, fontSize: 11, fontWeight: 600 }}>{user.active !== false ? 'Active' : 'Inactive'}</span>
+                  </div>
+                  <div style={{ fontSize: 11, color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email}</div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 11, fontFamily: 'monospace', color: showPassFor === user.id ? '#1a1a2e' : '#9ca3af' }}>
+                    {showPassFor === user.id ? (user.temp_password || '—') : '••••••••'}
+                  </span>
+                  <button onClick={() => setShowPassFor(showPassFor === user.id ? null : user.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: 12, padding: 0 }}>
+                    {showPassFor === user.id ? '🙈' : '👁'}
+                  </button>
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button style={{ ...s.btnGhost, padding: '5px 10px', fontSize: 11 }} onClick={() => openEdit(user)}>Edit</button>
+                  {user.role !== 'admin' && (
+                    <button onClick={() => toggleActive(user)} style={{ padding: '5px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: 'none', background: user.active !== false ? 'rgba(239,68,68,0.12)' : 'rgba(16,185,129,0.12)', color: user.active !== false ? '#ef4444' : '#10b981' }}>
+                      {user.active !== false ? 'Off' : 'On'}
+                    </button>
+                  )}
+                  {user.role !== 'admin' && (
+                    <button onClick={() => deleteUser(user)} style={{ padding: '5px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: '1px solid #ef4444', background: 'transparent', color: '#ef4444' }}>🗑</button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -1810,6 +1842,7 @@ function TeamView({ allUsers, setAllUsers }) {
 
 // ─── Payroll View ────────────────────────────────────────────────────────────
 function PayrollView({ jobs, allUsers, setAllUsers }) {
+  const isMobile = useIsMobile();
   const [editingRate, setEditingRate] = useState(null);
   const [rateForm, setRateForm] = useState({ rep_rate: '', tech_rate: '' });
   const [saving, setSaving] = useState(false);
@@ -1868,7 +1901,7 @@ function PayrollView({ jobs, allUsers, setAllUsers }) {
       <div style={s.page}>
 
         {/* Summary stats */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 24 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3,1fr)', gap: isMobile ? 8 : 12, marginBottom: isMobile ? 14 : 24 }}>
           <div style={s.card()}>
             <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>Total Revenue Collected</div>
             <div style={{ fontWeight: 800, fontSize: 26, color: '#f59e0b' }}>${totalRevenue.toFixed(2)}</div>
@@ -1884,103 +1917,70 @@ function PayrollView({ jobs, allUsers, setAllUsers }) {
         </div>
 
         {/* Per person breakdown */}
-        <div style={{ background: '#ffffff', border: '1px solid #2a2a3a', borderRadius: 8, overflow: 'hidden', marginBottom: 24 }}>
+        {/* Per person breakdown */}
+        <div style={{ background: '#ffffff', border: '1px solid #e8ecf0', borderRadius: 8, overflow: 'hidden', marginBottom: 24 }}>
           <div style={{ padding: '14px 16px', borderBottom: '1px solid #e2e4e8', fontWeight: 700, fontSize: 14, color: '#1a1a2e' }}>Team Earnings</div>
-          <table style={s.table}>
-            <thead>
-              <tr>
-                <th style={s.th}>Name</th>
-                <th style={s.th}>Role</th>
-                <th style={s.th}>Rep Rate</th>
-                <th style={s.th}>Tech Rate</th>
-                <th style={s.th}>Rep Jobs</th>
-                <th style={s.th}>Tech Jobs</th>
-                <th style={s.th}>Rep Earned</th>
-                <th style={s.th}>Tech Earned</th>
-                <th style={s.th}>Total Owed</th>
-                <th style={s.th}></th>
-              </tr>
-            </thead>
-            <tbody>
-              {workers.map(user => {
-                const e = getEarnings(user);
-                return (
-                  <tr key={user.id}>
-                    <td style={s.td}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <Avatar name={user.name} role={user.role} size={26} />
-                        <span style={{ fontWeight: 600 }}>{user.name}</span>
-                      </div>
-                    </td>
-                    <td style={s.td}>
-                      <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: user.role === 'rep' ? 'rgba(16,185,129,0.15)' : user.role === 'tech' ? 'rgba(245,158,11,0.15)' : 'rgba(55,138,221,0.15)', color: user.role === 'rep' ? '#10b981' : user.role === 'tech' ? '#f59e0b' : '#378add', fontWeight: 600, textTransform: 'capitalize' }}>{user.role}</span>
-                    </td>
-                    <td style={s.td}>
-                      <span style={{ color: '#10b981', fontWeight: 600 }}>{e.repRate}%</span>
-                    </td>
-                    <td style={s.td}>
-                      <span style={{ color: '#f59e0b', fontWeight: 600 }}>{e.techRate}%</span>
-                    </td>
-                    <td style={{ ...s.td, color: '#6b7280' }}>{e.repJobs}</td>
-                    <td style={{ ...s.td, color: '#6b7280' }}>{e.techJobs}</td>
-                    <td style={s.td}><span style={{ color: '#10b981', fontWeight: 600 }}>${e.repEarnings.toFixed(2)}</span></td>
-                    <td style={s.td}><span style={{ color: '#f59e0b', fontWeight: 600 }}>${e.techEarnings.toFixed(2)}</span></td>
-                    <td style={s.td}>
-                      <span style={{ fontWeight: 800, fontSize: 15, color: e.total > 0 ? '#ef4444' : '#9ca3af' }}>${e.total.toFixed(2)}</span>
-                    </td>
-                    <td style={s.td}>
-                      <button style={{ ...s.btnGhost, fontSize: 11, padding: '5px 10px' }} onClick={() => openEdit(user)}>
-                        ✏️ Set Rate
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Job breakdown per person */}
-        {workers.map(user => {
-          const userJobs = jobs.filter(j => ['complete','paid','serviced'].includes(j.status) && (String(j.rep_id) === String(user.id) || String(j.tech_id) === String(user.id)));
-          if (userJobs.length === 0) return null;
-          const e = getEarnings(user);
-          return (
-            <div key={user.id} style={{ ...s.card({ marginBottom: 16 }) }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <Avatar name={user.name} role={user.role} size={30} />
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: 14 }}>{user.name}</div>
-                    <div style={{ fontSize: 11, color: '#6b7280' }}>{userJobs.length} completed jobs · ${e.total.toFixed(2)} owed</div>
+          {workers.map(user => {
+            const e = getEarnings(user);
+            const roleColor2 = user.role === 'rep' ? '#10b981' : user.role === 'tech' ? '#f59e0b' : '#378add';
+            return (
+              <div key={user.id} style={{ padding: '12px 16px', borderBottom: '1px solid #f0f2f5', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <Avatar name={user.name} role={user.role} size={36} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                    <span style={{ fontWeight: 600, fontSize: 13 }}>{user.name}</span>
+                    <span style={{ fontWeight: 800, fontSize: 14, color: e.total > 0 ? '#ef4444' : '#9ca3af' }}>${e.total.toFixed(2)}</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, fontSize: 11, color: '#9ca3af', flexWrap: 'wrap' }}>
+                    <span style={{ color: roleColor2, textTransform: 'capitalize', fontWeight: 600 }}>{user.role}</span>
+                    {e.repRate > 0 && <span>Rep {e.repRate}% · <span style={{ color: '#10b981' }}>${e.repEarnings.toFixed(2)}</span></span>}
+                    {e.techRate > 0 && <span>Tech {e.techRate}% · <span style={{ color: '#f59e0b' }}>${e.techEarnings.toFixed(2)}</span></span>}
+                    {e.repRate === 0 && e.techRate === 0 && <span style={{ color: '#9ca3af' }}>No rate set</span>}
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 16 }}>
+                <button style={{ ...s.btnGhost, fontSize: 11, padding: '6px 10px', flexShrink: 0 }} onClick={() => openEdit(user)}>✏️</button>
+              {userJobs.map(j => {
+                const isRep = String(j.rep_id) === String(user.id);
+                const isTech = String(j.tech_id) === String(user.id);
+                const rate = isRep ? e.repRate : e.techRate;
+                const earned = (j.price || 0) * rate / 100;
+                return (
+                  <div key={j.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #f0f2f5' }}>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 500 }}>{j.customer_name}</div>
+                      <div style={{ fontSize: 11, color: '#9ca3af', textTransform: 'capitalize' }}>{j.service} · <span style={{ color: isRep ? '#10b981' : '#f59e0b' }}>{isRep && isTech ? 'Rep + Tech' : isRep ? 'Rep' : 'Tech'}</span> · {rate}%</div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: 11, color: '#9ca3af' }}>${j.price}</div>
+                      <div style={{ fontWeight: 700, color: '#1a1a2e' }}>${earned.toFixed(2)}</div>
+                    </div>
+                  </div>
+                );
+              })}
                   {e.repRate > 0 && <div style={{ textAlign: 'right' }}><div style={{ fontSize: 10, color: '#6b7280' }}>Rep Rate</div><div style={{ fontSize: 13, color: '#10b981', fontWeight: 700 }}>{e.repRate}%</div></div>}
                   {e.techRate > 0 && <div style={{ textAlign: 'right' }}><div style={{ fontSize: 10, color: '#6b7280' }}>Tech Rate</div><div style={{ fontSize: 13, color: '#f59e0b', fontWeight: 700 }}>{e.techRate}%</div></div>}
                 </div>
               </div>
-              <table style={s.table}>
-                <thead><tr><th style={s.th}>Customer</th><th style={s.th}>Service</th><th style={s.th}>Job Price</th><th style={s.th}>Role</th><th style={s.th}>Cut</th><th style={s.th}>Earned</th></tr></thead>
-                <tbody>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
                   {userJobs.map(j => {
                     const isRep = String(j.rep_id) === String(user.id);
                     const isTech = String(j.tech_id) === String(user.id);
                     const rate = isRep ? e.repRate : e.techRate;
                     const earned = (j.price || 0) * rate / 100;
                     return (
-                      <tr key={j.id}>
-                        <td style={s.td}>{j.customer_name}</td>
-                        <td style={{ ...s.td, textTransform: 'capitalize', fontSize: 12 }}>{j.service}</td>
-                        <td style={{ ...s.td, fontWeight: 600 }}>${j.price}</td>
-                        <td style={s.td}><span style={{ fontSize: 11, color: isRep ? '#10b981' : '#f59e0b' }}>{isRep && isTech ? 'Rep + Tech' : isRep ? 'Rep' : 'Tech'}</span></td>
-                        <td style={{ ...s.td, color: '#6b7280' }}>{rate}%</td>
-                        <td style={{ ...s.td, fontWeight: 700, color: '#1a1a2e' }}>${earned.toFixed(2)}</td>
-                      </tr>
+                      <div key={j.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#f8f9fb', borderRadius: 6 }}>
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: 13 }}>{j.customer_name}</div>
+                          <div style={{ fontSize: 11, color: '#6b7280', marginTop: 1, textTransform: 'capitalize' }}>{j.service} · {isRep && isTech ? 'Rep + Tech' : isRep ? 'Rep' : 'Tech'} · {rate}%</div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: 12, color: '#6b7280' }}>${j.price}</div>
+                          <div style={{ fontWeight: 700, fontSize: 13, color: '#10b981' }}>+${earned.toFixed(2)}</div>
+                        </div>
+                      </div>
                     );
                   })}
-                </tbody>
-              </table>
+                </div>
             </div>
           );
         })}
@@ -2087,8 +2087,8 @@ export default function App() {
   if (!user) return <AuthScreen onLogin={u => { setUser(u); setPage(u.role === 'tech' ? 'jobs' : u.role === 'admin' ? 'dashboard' : 'map'); }} />;
 
   const NAV = {
-    admin: [{ id: 'dashboard', icon: '📊', label: 'Dashboard' }, { id: 'map', icon: '🗺', label: 'Field Map' }, { id: 'schedule', icon: '📅', label: 'Schedule' }, { id: 'customers', icon: '👥', label: 'Customers' }, { id: 'team', icon: '🧑‍💼', label: 'Team' }, { id: 'payroll', icon: '💰', label: 'Payroll' }],
-    rep: [{ id: 'map', icon: '🗺', label: 'Field Map' }, { id: 'schedule', icon: '📅', label: 'Schedule' }, { id: 'dashboard', icon: '📈', label: 'My Stats' }, { id: 'customers', icon: '👥', label: 'Customers' }],
+    admin: [{ id: 'dashboard', icon: '📊', label: 'Dash' }, { id: 'map', icon: '🗺', label: 'Map' }, { id: 'schedule', icon: '📅', label: 'Schedule' }, { id: 'customers', icon: '👥', label: 'Clients' }, { id: 'team', icon: '🧑‍💼', label: 'Team' }, { id: 'payroll', icon: '💰', label: 'Payroll' }],
+    rep: [{ id: 'map', icon: '🗺', label: 'Map' }, { id: 'schedule', icon: '📅', label: 'Schedule' }, { id: 'dashboard', icon: '📈', label: 'Stats' }, { id: 'customers', icon: '👥', label: 'Clients' }],
     tech: [{ id: 'jobs', icon: '🔧', label: 'My Jobs' }, { id: 'schedule', icon: '📅', label: 'Schedule' }],
   };
 
@@ -2132,25 +2132,25 @@ export default function App() {
         </div>
 
         {/* Mobile bottom nav */}
-        <div style={{ background: '#ffffff', borderTop: '1px solid #2a2a3a', display: 'flex', flexShrink: 0, paddingBottom: 'max(env(safe-area-inset-bottom), 8px)' }}>
+        <div style={{ background: '#ffffff', borderTop: '1px solid #e2e4e8', display: 'flex', flexShrink: 0, paddingBottom: 'max(env(safe-area-inset-bottom), 6px)', overflowX: 'auto' }}>
           {NAV[user.role].map(item => (
             <button key={item.id} onClick={() => setPage(item.id)} style={{
-              flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-              padding: '8px 4px', border: 'none', background: 'transparent', cursor: 'pointer',
-              color: page === item.id ? '#378add' : '#9ca3af', transition: 'color 0.15s',
-              borderTop: page === item.id ? '2px solid #4f8ef7' : '2px solid transparent',
+              flex: 1, minWidth: 48, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              padding: '6px 2px', border: 'none', background: 'transparent', cursor: 'pointer',
+              color: page === item.id ? '#185fa5' : '#9ca3af', transition: 'color 0.15s',
+              borderTop: page === item.id ? '2px solid #185fa5' : '2px solid transparent',
             }}>
-              <span style={{ fontSize: 20, marginBottom: 2 }}>{item.icon}</span>
-              <span style={{ fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.3px' }}>{item.label}</span>
+              <span style={{ fontSize: 17, marginBottom: 1, lineHeight: 1 }}>{item.icon}</span>
+              <span style={{ fontSize: 8, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.2px', whiteSpace: 'nowrap' }}>{item.label === 'Field Map' ? 'Map' : item.label === 'Dashboard' ? 'Dash' : item.label === 'Customers' ? 'Clients' : item.label === 'Schedule' ? 'Cal' : item.label}</span>
             </button>
           ))}
           <button onClick={async () => { await supabase.auth.signOut(); setUser(null); setPage('map'); }} style={{
-            flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            padding: '8px 4px', border: 'none', background: 'transparent', cursor: 'pointer', color: '#9ca3af',
+            flex: 1, minWidth: 48, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            padding: '6px 2px', border: 'none', background: 'transparent', cursor: 'pointer', color: '#9ca3af',
             borderTop: '2px solid transparent',
           }}>
-            <span style={{ fontSize: 20, marginBottom: 2 }}>🚪</span>
-            <span style={{ fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.3px' }}>Out</span>
+            <span style={{ fontSize: 17, marginBottom: 1, lineHeight: 1 }}>🚪</span>
+            <span style={{ fontSize: 8, fontWeight: 600, textTransform: 'uppercase' }}>Out</span>
           </button>
         </div>
       </div>
