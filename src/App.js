@@ -1938,24 +1938,6 @@ function PayrollView({ jobs, allUsers, setAllUsers }) {
                   </div>
                 </div>
                 <button style={{ ...s.btnGhost, fontSize: 11, padding: '6px 10px', flexShrink: 0 }} onClick={() => openEdit(user)}>✏️</button>
-              {userJobs.map(j => {
-                const isRep = String(j.rep_id) === String(user.id);
-                const isTech = String(j.tech_id) === String(user.id);
-                const rate = isRep ? e.repRate : e.techRate;
-                const earned = (j.price || 0) * rate / 100;
-                return (
-                  <div key={j.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #f0f2f5' }}>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 500 }}>{j.customer_name}</div>
-                      <div style={{ fontSize: 11, color: '#9ca3af', textTransform: 'capitalize' }}>{j.service} · <span style={{ color: isRep ? '#10b981' : '#f59e0b' }}>{isRep && isTech ? 'Rep + Tech' : isRep ? 'Rep' : 'Tech'}</span> · {rate}%</div>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: 11, color: '#9ca3af' }}>${j.price}</div>
-                      <div style={{ fontWeight: 700, color: '#1a1a2e' }}>${earned.toFixed(2)}</div>
-                    </div>
-                  </div>
-                );
-              })}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
                   {userJobs.map(j => {
                     const isRep = String(j.rep_id) === String(user.id);
