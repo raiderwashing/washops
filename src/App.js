@@ -1128,7 +1128,6 @@ function ScheduleView({ jobs, setJobs, currentUser, allUsers }) {
             </div>
           ))}
         </div>
-        </div>
       </div>
       {selected && (
         <div style={s.backdrop} onClick={e => e.target === e.currentTarget && setSelected(null)}>
