@@ -453,7 +453,7 @@ function MapView({ pins, setPins, currentUser, allUsers, jobs, setJobs, zones, s
   const finishDrawingRef = React.useRef(null);
   const techs = allUsers.filter(u => u.role === 'tech');
   const reps = allUsers.filter(u => u.role === 'rep' || u.role === 'admin');
-  const visiblePins = currentUser.role === 'admin' ? pins : pins.filter(p => p.rep_id === currentUser.id);
+  const visiblePins = pins; // All pins visible to everyone
 
   useEffect(() => {
     loadGoogleMaps().then(() => {
@@ -983,10 +983,18 @@ function ScheduleView({ jobs, setJobs, currentUser, allUsers }) {
 
   const markServiced = async (job) => {
     const now = new Date();
+    // Auto-calc next clean date for quarterly (3 months out)
+    let nextClean = null;
+    if (job.service === 'quarterly') {
+      const next = new Date(now);
+      next.setMonth(next.getMonth() + 3);
+      nextClean = next.toISOString().split('T')[0];
+    }
     const { data: updated } = await supabase.from('jobs').update({
       status: 'serviced',
       completed_date: now.toISOString().split('T')[0],
       scheduled_time: job.scheduled_time || now.toTimeString().slice(0,5),
+      next_clean_date: nextClean,
     }).eq('id', job.id).select().single();
     setJobs(js => js.map(j => j.id === job.id ? updated : j));
     // Auto-close linked pin
@@ -1620,12 +1628,18 @@ function TechDashboard({ jobs, setJobs, currentUser }) {
 
   const markServiced = async (job) => {
     const now = new Date();
+    let nextClean = null;
+    if (job.service === 'quarterly') {
+      const next = new Date(now);
+      next.setMonth(next.getMonth() + 3);
+      nextClean = next.toISOString().split('T')[0];
+    }
     const { data: updated } = await supabase.from('jobs').update({
       status: 'serviced',
       completed_date: now.toISOString().split('T')[0],
+      next_clean_date: nextClean,
     }).eq('id', job.id).select().single();
     setJobs(js => js.map(j => j.id === job.id ? updated : j));
-    // Auto-update linked pin from appointment to closed
     if (job.address && job.rep_id) {
       const { data: linkedPin } = await supabase.from('pins')
         .select('id').eq('address', job.address).eq('rep_id', job.rep_id).maybeSingle();
@@ -1663,50 +1677,159 @@ function TechDashboard({ jobs, setJobs, currentUser }) {
 }
 
 // ─── Customers ────────────────────────────────────────────────────────────────
-function CustomersView({ pins, jobs }) {
+function CustomersView({ pins, jobs, allUsers }) {
   const isMobile = useIsMobile();
+  const [expanded, setExpanded] = useState(null);
+  const [editNextClean, setEditNextClean] = useState(null);
+  const [nextCleanForm, setNextCleanForm] = useState('');
+
+  // Show all closed/paid/appointment pins across all reps
   const customers = pins.filter(p => ['closed','paid','appointment'].includes(p.status));
+
+  const getJob = (pin) => jobs.find(j => j.address === pin.address);
+
+  const getDaysUntil = (dateStr) => {
+    if (!dateStr) return null;
+    const diff = Math.ceil((new Date(dateStr) - new Date()) / (1000 * 60 * 60 * 24));
+    return diff;
+  };
+
+  const updateNextClean = async (jobId, date) => {
+    await supabase.from('jobs').update({ next_clean_date: date }).eq('id', jobId);
+    setEditNextClean(null);
+  };
+
+  const getNextCleanStatus = (dateStr) => {
+    const days = getDaysUntil(dateStr);
+    if (days === null) return null;
+    if (days < 0) return { label: `${Math.abs(days)}d overdue`, color: '#ef4444' };
+    if (days <= 14) return { label: `Due in ${days}d`, color: '#f59e0b' };
+    return { label: `In ${days}d`, color: '#10b981' };
+  };
+
+  const openMap = (pin) => {
+    if (pin.lat && pin.lng) {
+      window.open(`https://maps.google.com/?q=${pin.lat},${pin.lng}`, '_blank');
+    } else {
+      window.open(`https://maps.google.com/?q=${encodeURIComponent(pin.address)}`, '_blank');
+    }
+  };
+
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      <div style={s.topbar}><div style={s.topbarTitle}>👥 Customers</div><span style={{ fontSize: 12, color: '#6b7280' }}>{customers.length} active</span></div>
+      <div style={s.topbar}>
+        <div style={s.topbarTitle}>👥 Customers</div>
+        <span style={{ fontSize: 12, color: '#6b7280' }}>{customers.length} active</span>
+      </div>
       <div style={{ ...s.page, padding: isMobile ? 12 : 20 }}>
-        {isMobile ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {customers.map(c => {
-              const job = jobs.find(j => j.address === c.address);
-              return (
-                <div key={c.id} style={{ background: '#ffffff', border: '1px solid #e8ecf0', borderRadius: 8, padding: 14 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                    <div style={{ fontWeight: 600, fontSize: 15 }}>{c.name || 'Unknown'}</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {customers.map(c => {
+            const job = getJob(c);
+            const isExpanded = expanded === c.id;
+            const nextCleanStatus = getNextCleanStatus(job?.next_clean_date);
+            const rep = allUsers?.find(u => u.id === c.rep_id);
+
+            return (
+              <div key={c.id} style={{ background: '#ffffff', border: `1px solid ${isExpanded ? '#378add' : '#e8ecf0'}`, borderRadius: 8, overflow: 'hidden', transition: 'border-color 0.15s' }}>
+                {/* Main row - tap to expand */}
+                <div onClick={() => setExpanded(isExpanded ? null : c.id)} style={{ padding: '12px 14px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 2 }}>{c.name || 'Unknown'}</div>
+                    <div style={{ fontSize: 11, color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.address?.split(',')[0]}</div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+                    {nextCleanStatus && (
+                      <span style={{ fontSize: 11, fontWeight: 600, color: nextCleanStatus.color, background: `${nextCleanStatus.color}18`, padding: '2px 8px', borderRadius: 10 }}>
+                        {nextCleanStatus.label}
+                      </span>
+                    )}
                     <Badge status={c.status} />
+                    <span style={{ color: '#9ca3af', fontSize: 14 }}>{isExpanded ? '▲' : '▼'}</span>
                   </div>
-                  <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}>📍 {c.address}</div>
-                  <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 12, textTransform: 'capitalize' }}><span style={{ color: '#9ca3af' }}>Plan: </span>{c.service || '—'}</span>
-                    <span style={{ fontSize: 12, fontWeight: 700 }}><span style={{ color: '#9ca3af', fontWeight: 400 }}>Price: </span>{c.price ? `$${c.price}` : '—'}</span>
-                    <span style={{ fontSize: 12, color: job?.card_on_file ? '#10b981' : '#9ca3af' }}>{job?.card_on_file ? '✅ Card on file' : 'No card'}</span>
-                  </div>
-                  {c.notes && <div style={{ fontSize: 12, color: '#6b7280', marginTop: 8, borderTop: '1px solid #f0f2f5', paddingTop: 8 }}>📝 {c.notes}</div>}
                 </div>
-              );
-            })}
-            {customers.length === 0 && <div style={{ textAlign: 'center', padding: 48, color: '#9ca3af' }}>No customers yet</div>}
-          </div>
-        ) : (
-          <div style={{ background: '#ffffff', border: '1px solid #e8ecf0', borderRadius: 8, overflow: 'hidden' }}>
-            <table style={s.table}>
-              <thead><tr><th style={s.th}>Name</th><th style={s.th}>Address</th><th style={s.th}>Plan</th><th style={s.th}>Price</th><th style={s.th}>Status</th><th style={s.th}>Card on File</th><th style={s.th}>Notes</th></tr></thead>
-              <tbody>{customers.map(c => { const job = jobs.find(j => j.address === c.address); return <tr key={c.id}><td style={{ ...s.td, fontWeight: 500 }}>{c.name || 'Unknown'}</td><td style={{ ...s.td, fontSize: 12, color: '#6b7280' }}>{c.address}</td><td style={{ ...s.td, fontSize: 12, textTransform: 'capitalize' }}>{c.service || '—'}</td><td style={{ ...s.td, fontWeight: 700 }}>{c.price ? `$${c.price}` : '—'}</td><td style={s.td}><Badge status={c.status} /></td><td style={{ ...s.td, fontSize: 12, color: job?.card_on_file ? '#10b981' : '#9ca3af' }}>{job?.card_on_file ? '✅ On file' : '—'}</td><td style={{ ...s.td, fontSize: 12, color: '#6b7280', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.notes}</td></tr>; })}</tbody>
-            </table>
-          </div>
-        )}
+
+                {/* Expanded details */}
+                {isExpanded && (
+                  <div style={{ borderTop: '1px solid #f0f2f5', padding: '12px 14px', background: '#fafbfc' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+                      <div>
+                        <div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 2 }}>ADDRESS</div>
+                        <div style={{ fontSize: 12, fontWeight: 500 }}>{c.address}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 2 }}>PLAN</div>
+                        <div style={{ fontSize: 12, fontWeight: 500, textTransform: 'capitalize' }}>{c.service || '—'} · ${c.price || 0}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 2 }}>LAST CLEANED</div>
+                        <div style={{ fontSize: 12, fontWeight: 500, color: job?.completed_date ? '#185fa5' : '#9ca3af' }}>
+                          {job?.completed_date || '—'}
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 2 }}>NEXT CLEAN</div>
+                        {editNextClean === c.id ? (
+                          <div style={{ display: 'flex', gap: 4 }}>
+                            <input type="date" value={nextCleanForm} onChange={e => setNextCleanForm(e.target.value)}
+                              style={{ ...s.input, padding: '4px 8px', fontSize: 11, flex: 1 }} />
+                            <button onClick={() => updateNextClean(job?.id, nextCleanForm)} style={{ ...s.btnAccent, padding: '4px 8px', fontSize: 11 }}>✓</button>
+                            <button onClick={() => setEditNextClean(null)} style={{ ...s.btnGhost, padding: '4px 8px', fontSize: 11 }}>✕</button>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ fontSize: 12, fontWeight: 500, color: nextCleanStatus?.color || '#9ca3af' }}>
+                              {job?.next_clean_date || '—'}
+                            </span>
+                            {job && (
+                              <button onClick={(e) => { e.stopPropagation(); setNextCleanForm(job.next_clean_date || ''); setEditNextClean(c.id); }}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#9ca3af', padding: 0 }}>✏️</button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      {rep && (
+                        <div>
+                          <div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 2 }}>REP</div>
+                          <div style={{ fontSize: 12, fontWeight: 500 }}>{rep.name}</div>
+                        </div>
+                      )}
+                      {c.notes && (
+                        <div style={{ gridColumn: '1/-1' }}>
+                          <div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 2 }}>NOTES</div>
+                          <div style={{ fontSize: 12, color: '#6b7280' }}>{c.notes}</div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Action buttons */}
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button onClick={() => openMap(c)} style={{ ...s.btnGhost, flex: 1, fontSize: 12, textAlign: 'center' }}>
+                        🗺 View on Map
+                      </button>
+                      {job?.card_on_file && (
+                        <div style={{ flex: 1, background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 8, padding: '6px 10px', textAlign: 'center', fontSize: 12, color: '#10b981', fontWeight: 600 }}>
+                          ✅ Card on file
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {customers.length === 0 && (
+            <div style={{ textAlign: 'center', padding: 48, color: '#9ca3af' }}>
+              <div style={{ fontSize: 36, marginBottom: 8 }}>👥</div>
+              <div>No customers yet</div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
 
-// ─── Team View ────────────────────────────────────────────────────────────────
 function TeamView({ allUsers, setAllUsers }) {
   const isMobile = useIsMobile();
   const [showModal, setShowModal] = useState(false);
@@ -2153,7 +2276,7 @@ export default function App() {
       setAllUsers(usersData || []);
     }} /> : <RepDashboard pins={pins} jobs={jobs} currentUser={user} />;
     if (page === 'jobs') return <TechDashboard jobs={jobs} setJobs={setJobs} currentUser={user} />;
-    if (page === 'customers') return <CustomersView pins={pins} jobs={jobs} />;
+    if (page === 'customers') return <CustomersView pins={pins} jobs={jobs} allUsers={allUsers} />;
     if (page === 'team') return <TeamView allUsers={allUsers} setAllUsers={setAllUsers} />;
     if (page === 'payroll') return <PayrollView jobs={jobs} allUsers={allUsers} setAllUsers={setAllUsers} />;
     return null;
