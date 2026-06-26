@@ -433,7 +433,7 @@ function loadGoogleMaps() {
   });
 }
 
-function MapView({ pins, setPins, currentUser, allUsers, jobs, setJobs, zones, setZones }) {
+function MapView({ pins, setPins, currentUser, allUsers, jobs, setJobs, zones, setZones, focusPin, onFocusConsumed }) {
   const [modal, setModal] = useState(null);
   const [mapReady, setMapReady] = useState(false);
   const [drawingMode, setDrawingMode] = useState(false);
@@ -551,6 +551,17 @@ function MapView({ pins, setPins, currentUser, allUsers, jobs, setJobs, zones, s
       if (locationWatchRef.current) navigator.geolocation.clearWatch(locationWatchRef.current);
     };
   }, []);
+
+  // Handle focusPin - center map on pin from Customers tab
+  useEffect(() => {
+    if (!googleMapRef.current || !mapReady || !focusPin) return;
+    if (focusPin.lat && focusPin.lng) {
+      googleMapRef.current.panTo({ lat: focusPin.lat, lng: focusPin.lng });
+      googleMapRef.current.setZoom(19);
+      setModal(focusPin);
+    }
+    if (onFocusConsumed) onFocusConsumed();
+  }, [focusPin, mapReady]);
 
   // Render pins as markers on the map
   useEffect(() => {
@@ -762,6 +773,13 @@ function MapView({ pins, setPins, currentUser, allUsers, jobs, setJobs, zones, s
   };
 
   const handleSave = async (data) => {
+    // Auto-calculate next clean date for quarterly plans
+    let autoNextClean = null;
+    if (data.service === 'quarterly' && data.follow_up_date) {
+      const next = new Date(data.follow_up_date);
+      next.setMonth(next.getMonth() + 3);
+      autoNextClean = next.toISOString().split('T')[0];
+    }
     const jobPayload = {
       address: data.address,
       customer_name: data.name,
@@ -777,6 +795,7 @@ function MapView({ pins, setPins, currentUser, allUsers, jobs, setJobs, zones, s
       card_on_file: false,
       notes: data.notes,
       pin_id: data.id || null,
+      next_clean_date: autoNextClean,
     };
 
     if (data.id) {
@@ -1677,7 +1696,7 @@ function TechDashboard({ jobs, setJobs, currentUser }) {
 }
 
 // ─── Customers ────────────────────────────────────────────────────────────────
-function CustomersView({ pins, jobs, allUsers }) {
+function CustomersView({ pins, jobs, allUsers, onViewMap }) {
   const isMobile = useIsMobile();
   const [expanded, setExpanded] = useState(null);
   const [editNextClean, setEditNextClean] = useState(null);
@@ -1708,11 +1727,7 @@ function CustomersView({ pins, jobs, allUsers }) {
   };
 
   const openMap = (pin) => {
-    if (pin.lat && pin.lng) {
-      window.open(`https://maps.google.com/?q=${pin.lat},${pin.lng}`, '_blank');
-    } else {
-      window.open(`https://maps.google.com/?q=${encodeURIComponent(pin.address)}`, '_blank');
-    }
+    if (onViewMap) onViewMap(pin);
   };
 
   return (
@@ -2196,6 +2211,7 @@ export default function App() {
   const [jobs, setJobs] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
   const [zones, setZones] = useState([]);
+  const [focusPin, setFocusPin] = useState(null);
   const [loading, setLoading] = useState(true);
 
   // Load data from Supabase on login
@@ -2263,7 +2279,7 @@ export default function App() {
   const roleColor = { admin: '#378add', rep: '#10b981', tech: '#f59e0b' }[user.role];
 
   const renderPage = () => {
-    if (page === 'map') return <MapView pins={pins} setPins={setPins} currentUser={user} allUsers={allUsers} jobs={jobs} setJobs={setJobs} zones={zones} setZones={setZones} />;
+    if (page === 'map') return <MapView pins={pins} setPins={setPins} currentUser={user} allUsers={allUsers} jobs={jobs} setJobs={setJobs} zones={zones} setZones={setZones} focusPin={focusPin} onFocusConsumed={() => setFocusPin(null)} />;
     if (page === 'schedule') return <ScheduleView jobs={jobs} setJobs={setJobs} currentUser={user} allUsers={allUsers} />;
     if (page === 'dashboard') return user.role === 'admin' ? <AdminDashboard pins={pins} jobs={jobs} allUsers={allUsers} onRefresh={async () => {
       const [{ data: pinsData }, { data: jobsData }, { data: usersData }] = await Promise.all([
@@ -2276,7 +2292,7 @@ export default function App() {
       setAllUsers(usersData || []);
     }} /> : <RepDashboard pins={pins} jobs={jobs} currentUser={user} />;
     if (page === 'jobs') return <TechDashboard jobs={jobs} setJobs={setJobs} currentUser={user} />;
-    if (page === 'customers') return <CustomersView pins={pins} jobs={jobs} allUsers={allUsers} />;
+    if (page === 'customers') return <CustomersView pins={pins} jobs={jobs} allUsers={allUsers} onViewMap={(pin) => { setFocusPin(pin); setPage('map'); }} />;
     if (page === 'team') return <TeamView allUsers={allUsers} setAllUsers={setAllUsers} />;
     if (page === 'payroll') return <PayrollView jobs={jobs} allUsers={allUsers} setAllUsers={setAllUsers} />;
     return null;
