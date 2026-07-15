@@ -441,6 +441,7 @@ function MapView({ pins, setPins, currentUser, allUsers, jobs, setJobs, zones, s
   const [zoneModal, setZoneModal] = useState(false);
   const [pendingZone, setPendingZone] = useState(null);
   const [zoneForm, setZoneForm] = useState({ name: '', repId: '' });
+  const [zonesOpen, setZonesOpen] = useState(false);
   const mapDivRef = React.useRef(null);
   const googleMapRef = React.useRef(null);
   const markersRef = React.useRef([]);
@@ -918,22 +919,28 @@ function MapView({ pins, setPins, currentUser, allUsers, jobs, setJobs, zones, s
           </div>
         )}
 
-        {/* Zone list — admin only */}
+        {/* Zone list — admin only, collapsible */}
         {currentUser.role === 'admin' && mapReady && zones && zones.length > 0 && !drawingMode && (
-          <div style={{ position: 'absolute', bottom: 40, right: 10, background: '#ffffff', border: '1px solid #2a2a3a', borderRadius: 10, padding: 12, zIndex: 10, maxWidth: 200 }}>
-            <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 600, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Zones</div>
-            {zones.map(zone => {
-              const rep = allUsers.find(u => u.id === zone.rep_id);
-              return (
-                <div key={zone.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <div>
-                    <div style={{ fontSize: 12, fontWeight: 600 }}>{zone.name}</div>
-                    <div style={{ fontSize: 11, color: '#6b7280' }}>{rep ? rep.name.split(' ')[0] : 'Unassigned'}</div>
-                  </div>
-                  <button onClick={() => deleteZone(zone.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 14, padding: '2px 6px' }}>🗑</button>
-                </div>
-              );
-            })}
+          <div style={{ position: 'absolute', bottom: 40, right: 10, zIndex: 10, display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+            {zonesOpen && (
+              <div style={{ background: '#ffffff', border: '1px solid #e2e4e8', borderRadius: 10, padding: 12, maxWidth: 200, maxHeight: 240, overflowY: 'auto', marginBottom: 6, boxShadow: '0 2px 12px rgba(0,0,0,0.12)' }}>
+                {zones.map(zone => {
+                  const rep = allUsers.find(u => u.id === zone.rep_id);
+                  return (
+                    <div key={zone.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                      <div>
+                        <div style={{ fontSize: 12, fontWeight: 600 }}>{zone.name}</div>
+                        <div style={{ fontSize: 11, color: '#6b7280' }}>{rep ? rep.name.split(' ')[0] : 'Unassigned'}</div>
+                      </div>
+                      <button onClick={() => deleteZone(zone.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 14, padding: '2px 6px' }}>🗑</button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <button onClick={() => setZonesOpen(o => !o)} style={{ background: '#ffffff', border: '1px solid #e2e4e8', borderRadius: 8, padding: '8px 12px', fontSize: 12, fontWeight: 600, color: '#185fa5', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.12)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              🗂 Zones ({zones.length}) {zonesOpen ? '▼' : '▲'}
+            </button>
           </div>
         )}
 
@@ -1701,11 +1708,22 @@ function CustomersView({ pins, jobs, allUsers, onViewMap }) {
   const [expanded, setExpanded] = useState(null);
   const [editNextClean, setEditNextClean] = useState(null);
   const [nextCleanForm, setNextCleanForm] = useState('');
-
-  // Show all closed/paid/appointment pins across all reps
-  const customers = pins.filter(p => ['closed','paid','appointment'].includes(p.status));
+  const [tab, setTab] = useState('quarterly'); // quarterly | one-time
 
   const getJob = (pin) => jobs.find(j => j.address === pin.address);
+
+  // Show all closed/paid/appointment pins across all reps, split by plan
+  const allCustomers = pins.filter(p => ['closed','paid','appointment'].includes(p.status));
+  const quarterlyCustomers = allCustomers
+    .filter(p => p.service === 'quarterly')
+    .sort((a, b) => {
+      const jA = getJob(a), jB = getJob(b);
+      const dA = jA?.next_clean_date ? new Date(jA.next_clean_date).getTime() : Infinity;
+      const dB = jB?.next_clean_date ? new Date(jB.next_clean_date).getTime() : Infinity;
+      return dA - dB; // soonest due first
+    });
+  const oneTimeCustomers = allCustomers.filter(p => p.service !== 'quarterly');
+  const customers = tab === 'quarterly' ? quarterlyCustomers : oneTimeCustomers;
 
   const getDaysUntil = (dateStr) => {
     if (!dateStr) return null;
@@ -1734,9 +1752,21 @@ function CustomersView({ pins, jobs, allUsers, onViewMap }) {
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <div style={s.topbar}>
         <div style={s.topbarTitle}>👥 Customers</div>
-        <span style={{ fontSize: 12, color: '#6b7280' }}>{customers.length} active</span>
+        <span style={{ fontSize: 12, color: '#6b7280' }}>{customers.length} {tab === 'quarterly' ? 'quarterly' : 'one-time'}</span>
       </div>
       <div style={{ ...s.page, padding: isMobile ? 12 : 20 }}>
+        {/* Plan tabs */}
+        <div style={{ display: 'flex', gap: 6, marginBottom: 14, background: '#eef1f5', borderRadius: 8, padding: 4 }}>
+          <button onClick={() => setTab('quarterly')} style={{ flex: 1, padding: '8px 12px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, background: tab === 'quarterly' ? '#ffffff' : 'transparent', color: tab === 'quarterly' ? '#185fa5' : '#6b7280', boxShadow: tab === 'quarterly' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none' }}>
+            🔄 Quarterly ({quarterlyCustomers.length})
+          </button>
+          <button onClick={() => setTab('one-time')} style={{ flex: 1, padding: '8px 12px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, background: tab === 'one-time' ? '#ffffff' : 'transparent', color: tab === 'one-time' ? '#185fa5' : '#6b7280', boxShadow: tab === 'one-time' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none' }}>
+            1️⃣ One-Time ({oneTimeCustomers.length})
+          </button>
+        </div>
+        {tab === 'quarterly' && quarterlyCustomers.length > 0 && (
+          <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 10 }}>Sorted by next clean — soonest due at top</div>
+        )}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {customers.map(c => {
             const job = getJob(c);
@@ -1834,8 +1864,8 @@ function CustomersView({ pins, jobs, allUsers, onViewMap }) {
           })}
           {customers.length === 0 && (
             <div style={{ textAlign: 'center', padding: 48, color: '#9ca3af' }}>
-              <div style={{ fontSize: 36, marginBottom: 8 }}>👥</div>
-              <div>No customers yet</div>
+              <div style={{ fontSize: 36, marginBottom: 8 }}>{tab === 'quarterly' ? '🔄' : '1️⃣'}</div>
+              <div>No {tab === 'quarterly' ? 'quarterly' : 'one-time'} customers yet</div>
             </div>
           )}
         </div>
